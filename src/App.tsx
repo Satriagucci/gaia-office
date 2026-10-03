@@ -4,6 +4,9 @@ import './styles/rooms.css'
 import SlackChat, { ChatMessage } from './components/SlackChat'
 import Character from './components/Character'
 import FurnitureRenderer from './components/FurnitureRenderer'
+import DivisionDashboard from './components/DivisionDashboard'
+import AgentInspectorModal from './components/AgentInspectorModal'
+import { DivisionTask, TaskStatus, Division } from './types'
 import { Agent, OfficeEvent, AGENT_CONFIGS } from './types'
 import { getCurrentPhase, getPhaseLabel, type DayPhase } from './daylight'
 import { ROOMS, type RoomId } from './rooms'
@@ -97,16 +100,15 @@ const BOSS_SPOT = MAIN_ROOM.agentSpots.find(s => s.id === 'spot-1') ?? MAIN_ROOM
 
 function createBoss(): Agent {
   const cfg = AGENT_CONFIGS[BOSS_ROLE] ?? AGENT_CONFIGS['default']
-  const spot = BOSS_SPOT ?? { id: 'spot-temp', type: 'desk' as const, x: 28.9, y: 66 }
-  const entry = MAIN_ROOM.entryPoint
+  const spot = { id: 'spot-1', type: 'desk' as const, x: 16.0, y: 20.0, spriteFacing: 'front-right' as const }
   const target = { x: spot.x, y: spot.y }
   return {
     id: BOSS_ID,
     name: cfg.title,
     type: 'subagent',
     role: BOSS_ROLE,
-    state: 'new-hire',
-    position: { x: entry.x, y: entry.y },
+    state: 'working',
+    position: { x: spot.x, y: spot.y }, // spawn directly in CEO chair!
     targetPosition: target,
     deskPosition: target,
     room: 'main-office',
@@ -118,27 +120,172 @@ function createBoss(): Agent {
     color: cfg.color,
     emoji: cfg.emoji,
     hiredAt: Date.now(),
-    pathQueue: computePath(entry, target),
+    pathQueue: [],
   }
 }
 
 // Claude — the assistant, always in the office at spot-2
 const CLAUDE_ID = 'assistant-claude'
 const CLAUDE_ROLE = 'assistant'
+
+function createRani(): Agent {
+  const cfg = AGENT_CONFIGS['devops']
+  return {
+    id: 'agent-devops-rani',
+    name: 'Rani',
+    type: 'subagent',
+    role: 'devops',
+    state: 'working',
+    position: { x: 25.0, y: 48.0 },
+    targetPosition: { x: 25.0, y: 48.0 },
+    deskPosition: { x: 25.0, y: 48.0 },
+    room: 'main-office',
+    assignedRoom: 'main-office',
+    spriteFacing: 'front-right',
+    task: 'Monitoring build clusters & container health',
+    statusText: 'monitoring k8s',
+    color: cfg.color,
+    emoji: cfg.emoji,
+    hiredAt: Date.now(),
+  }
+}
+
+function createAlya(): Agent {
+  const cfg = AGENT_CONFIGS['concierge']
+  return {
+    id: 'agent-concierge-alya',
+    name: 'Alya',
+    type: 'subagent',
+    role: 'concierge',
+    state: 'working',
+    position: { x: 88.0, y: 84.0 },
+    targetPosition: { x: 88.0, y: 84.0 },
+    deskPosition: { x: 88.0, y: 84.0 },
+    room: 'main-office',
+    assignedRoom: 'main-office',
+    spriteFacing: 'front-left',
+    task: 'Welcoming guests and routing incoming tasks',
+    statusText: 'reception on duty',
+    color: cfg.color,
+    emoji: cfg.emoji,
+    hiredAt: Date.now(),
+  }
+}
+
+function createMaya(): Agent {
+  const cfg = AGENT_CONFIGS['test-engineer']
+  return {
+    id: 'agent-qa-maya',
+    name: 'Maya',
+    type: 'subagent',
+    role: 'test-engineer',
+    state: 'working',
+    position: { x: 64.0, y: 41.5 },
+    targetPosition: { x: 64.0, y: 41.5 },
+    deskPosition: { x: 64.0, y: 41.5 },
+    room: 'main-office',
+    assignedRoom: 'main-office',
+    spriteFacing: 'front-left',
+    task: 'Studio media & QA automation',
+    statusText: 'video promo ready',
+    color: cfg.color,
+    emoji: cfg.emoji,
+    hiredAt: Date.now(),
+  }
+}
+
+const INITIAL_TASKS: DivisionTask[] = [
+  {
+    id: 'task-1',
+    title: 'Persetujuan Deploy v1.4.2 ke Production',
+    description: 'Release hotfix checkout BukainJalan Mobile butuh approval Boss sebelum merge.',
+    division: 'engineering',
+    status: 'needs_boss',
+    assignedAgentId: 'assistant-claude',
+    priority: 'urgent',
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now() - 1800000,
+  },
+  {
+    id: 'task-2',
+    title: 'Review Rencana Arsitektur Cache Redis',
+    description: 'Proposal peningkatan performa database orders & inventory oleh tim DevOps.',
+    division: 'devops',
+    status: 'needs_boss',
+    assignedAgentId: 'agent-devops-rani',
+    priority: 'high',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 3600000,
+  },
+  {
+    id: 'task-3',
+    title: 'Automated Container Healthcheck & Alerting',
+    description: 'Memasang Prometheus exporter di cluster VPS backend.',
+    division: 'devops',
+    status: 'in_progress',
+    assignedAgentId: 'agent-devops-rani',
+    toolCall: 'docker ps && k8s status',
+    priority: 'medium',
+    createdAt: Date.now() - 5400000,
+    updatedAt: Date.now() - 600000,
+  },
+  {
+    id: 'task-4',
+    title: 'Screening Tiket Bantuan & User Onboarding',
+    description: 'Follow-up 5 merchant baru yang butuh verifikasi rekening bank.',
+    division: 'operations',
+    status: 'in_progress',
+    assignedAgentId: 'agent-concierge-alya',
+    toolCall: 'check_kyc_queue()',
+    priority: 'medium',
+    createdAt: Date.now() - 10800000,
+    updatedAt: Date.now() - 1200000,
+  },
+  {
+    id: 'task-5',
+    title: 'Refactor Payment Gateway Webhook Dispatcher',
+    description: 'Penyesuaian signature verification untuk webhook QRIS & Virtual Account.',
+    division: 'engineering',
+    status: 'queued',
+    priority: 'high',
+    createdAt: Date.now() - 14400000,
+    updatedAt: Date.now() - 14400000,
+  },
+  {
+    id: 'task-6',
+    title: 'Migrasi Database Reporting ke ClickHouse',
+    description: 'Diparkir sementara menunggu kuota storage server diperluas bulan depan.',
+    division: 'devops',
+    status: 'parked',
+    priority: 'low',
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 43200000,
+  },
+  {
+    id: 'task-7',
+    title: 'Legacy SMS Gateway Provider',
+    description: 'Diusulkan buang karena biaya tinggi dan sudah 100% migrasi ke WhatsApp OTP.',
+    division: 'core_product',
+    status: 'discard_proposed',
+    priority: 'low',
+    createdAt: Date.now() - 172800000,
+    updatedAt: Date.now() - 86400000,
+  },
+]
+
 const CLAUDE_SPOT = MAIN_ROOM.agentSpots.find(s => s.id === 'spot-2') ?? null
 
 function createClaude(): Agent {
   const cfg = AGENT_CONFIGS[CLAUDE_ROLE] ?? AGENT_CONFIGS['default']
-  const spot = CLAUDE_SPOT ?? { id: 'spot-2', type: 'desk' as const, x: 37.9, y: 68.2, spriteFacing: 'rear-right' as const }
-  const entry = MAIN_ROOM.entryPoint
+  const spot = { id: 'spot-2', type: 'desk' as const, x: 18.0, y: 53.0, spriteFacing: 'front-right' as const }
   const target = { x: spot.x, y: spot.y }
   return {
     id: CLAUDE_ID,
     name: cfg.title,
     type: 'subagent',
     role: CLAUDE_ROLE,
-    state: 'new-hire',
-    position: { x: entry.x, y: entry.y },
+    state: 'working',
+    position: { x: spot.x, y: spot.y }, // spawn directly in Dev chair!
     targetPosition: target,
     deskPosition: target,
     room: 'main-office',
@@ -150,7 +297,7 @@ function createClaude(): Agent {
     color: cfg.color,
     emoji: cfg.emoji,
     hiredAt: Date.now() + 500, // arrives just after the boss
-    pathQueue: computePath(entry, target),
+    pathQueue: [],
   }
 }
 
@@ -280,17 +427,121 @@ const OFFICE_SIM_CHATTER = [
   { sender: 'DevOps', role: 'devops-engineer', msg: 'I declare BANKRUPTCY' },
 ]
 
+export interface OfficeZone {
+  id: string
+  name: string
+  emoji: string
+  x: number
+  y: number
+  zoom: number
+}
+
+export const OFFICE_ZONES: OfficeZone[] = [
+  { id: 'overview', name: 'BukainJalan HQ', emoji: '🏢', x: 50, y: 50, zoom: 1.0 },
+  { id: 'ceo', name: 'Ruang Boss', emoji: '👑', x: 16.0, y: 20.0, zoom: 1.45 },
+  { id: 'meeting', name: 'Ruang Meeting', emoji: '👥', x: 50.0, y: 14.0, zoom: 1.45 },
+  { id: 'devs', name: 'Dev Workstations', emoji: '💻', x: 20.0, y: 48.0, zoom: 1.4 },
+  { id: 'studio', name: 'Creator Studio', emoji: '🎬', x: 64.0, y: 41.5, zoom: 1.45 },
+  { id: 'lounge', name: 'Sunken Lounge', emoji: '🛋️', x: 54.0, y: 54.0, zoom: 1.45 },
+  { id: 'cafe-pool', name: 'Cafe & Sky Pool', emoji: '☕', x: 80.0, y: 50.0, zoom: 1.4 },
+  { id: 'musholla', name: 'Musholla Al-Ikhlas', emoji: '🕌', x: 18.5, y: 84.0, zoom: 1.45 },
+  { id: 'recreation', name: 'Bilyar & Game', emoji: '🎱', x: 46.5, y: 85.5, zoom: 1.45 },
+  { id: 'lobby', name: 'Lobi Resepsionis', emoji: '🛎️', x: 88.0, y: 84.0, zoom: 1.45 },
+]
+
 const App: React.FC = () => {
   // All hooks must be at the top — before any conditional returns.
   const theme = useTheme() // Why: re-render rooms + agents when /the-office toggles
   const [currentRoomId, setCurrentRoomId] = useState<RoomId>('main-office')
-  const [agents, setAgents] = useState<Agent[]>(() => [createBoss(), createClaude()])
+  const [agents, setAgents] = useState<Agent[]>(() => [createBoss(), createClaude(), createRani(), createAlya(), createMaya()])
+  const [tasks, setTasks] = useState<DivisionTask[]>(INITIAL_TASKS)
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false)
+  const [inspectingAgent, setInspectingAgent] = useState<Agent | null>(null)
+  const [spotlightTargetId, setSpotlightTargetId] = useState<string | null>(BOSS_ID)
+  const [nearbyAgent, setNearbyAgent] = useState<Agent | null>(null)
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0)
+  const [activeZoneId, setActiveZoneId] = useState<string>('overview')
+  const [cameraTarget, setCameraTarget] = useState<{ x: number; y: number; zoom: number }>({ x: 50, y: 50, zoom: 1.0 })
+
+  const handleZoneClick = (zone: OfficeZone) => {
+    setActiveZoneId(zone.id)
+    setSpotlightTargetId(null)
+    setCurrentRoomId('main-office')
+    setCameraTarget({ x: zone.x, y: zone.y, zoom: zone.zoom })
+    // If Boss was stuck in a legacy room, return Boss to main-office at zone position
+    setAgents(prev => prev.map(a => a.id === BOSS_ID && a.room !== 'main-office' ? { ...a, room: 'main-office', position: { x: zone.x, y: zone.y }, targetPosition: { x: zone.x, y: zone.y } } : a))
+  }
   const agentMetaRef = useRef<Map<string, AgentMeta>>(new Map([
     [BOSS_ID, { spawnedAt: Date.now(), arrivedAtDeskAt: Date.now(), idleSince: null, onBreak: false, breakStartedAt: null }],
     [CLAUDE_ID, { spawnedAt: Date.now(), arrivedAtDeskAt: Date.now(), idleSince: null, onBreak: false, breakStartedAt: null }],
   ]))
 
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+    // Periodic autonomous office mobility (team-wandering-loop)
+  // Agents walk naturally between Cafe, Lounge, Pool, Musholla, Billiard and Dev workstations
+  useEffect(() => {
+    const MOBILITY_TARGETS = [
+      { name: 'spot-coffee-1', x: 74.8, y: 55.2, msg: 'Ngopi dulu di Barista Cafe ☕' },
+      { name: 'spot-water-1',  x: 54.0, y: 54.0, msg: 'Santai bentar di Sunken Lounge 🛋️' },
+      { name: 'spot-water-2',  x: 86.4, y: 48.0, msg: 'Lihat view Sky Pool 🌊' },
+      { name: 'spot-musholla', x: 26.0, y: 84.0, msg: 'Waktunya sholat di Musholla Al-Ikhlas 🕌' },
+      { name: 'spot-billiard', x: 50.0, y: 85.0, msg: 'Main billiard bentar bareng tim 🎱' },
+      { name: 'spot-dev',      x: 18.0, y: 53.0, msg: 'Koordinasi fitur modul BukainJalan 💻' },
+    ]
+
+    const interval = setInterval(() => {
+      const current = agentsRef.current
+      // Find agents sitting at desk
+      const available = current.filter(a =>
+        a.id !== BOSS_ID &&
+        a.state === 'working' &&
+        Math.hypot(a.position.x - a.deskPosition.x, a.position.y - a.deskPosition.y) < 2
+      )
+      if (available.length === 0) return
+
+      const chosen = available[Math.floor(Math.random() * available.length)]
+      const destination = MOBILITY_TARGETS[Math.floor(Math.random() * MOBILITY_TARGETS.length)]
+      const path = computePath(chosen.position, { x: destination.x, y: destination.y })
+      const immediate = path.length > 0 ? path[0] : { x: destination.x, y: destination.y }
+      const queue = path.length > 1 ? path.slice(1).concat([{ x: destination.x, y: destination.y }]) : [{ x: destination.x, y: destination.y }]
+
+      // Send chosen agent to spot
+      setAgents(prev => prev.map(a => {
+        if (a.id !== chosen.id) return a
+        return {
+          ...a,
+          state: 'coffee-break' as const,
+          targetPosition: immediate,
+          pathQueue: queue,
+          statusText: destination.msg,
+        }
+      }))
+
+      // Return back to desk after 7 seconds
+      setTimeout(() => {
+        const ag = agentsRef.current.find(a => a.id === chosen.id)
+        if (!ag) return
+        const returnPath = computePath(ag.position, ag.deskPosition)
+        const returnImmediate = returnPath.length > 0 ? returnPath[0] : ag.deskPosition
+        const returnQueue = returnPath.length > 1 ? returnPath.slice(1).concat([ag.deskPosition]) : [ag.deskPosition]
+
+        setAgents(prev => prev.map(a => {
+          if (a.id !== chosen.id) return a
+          return {
+            ...a,
+            state: 'walking-to-desk' as const,
+            targetPosition: returnImmediate,
+            pathQueue: returnQueue,
+            statusText: 'Kembali fokus ngoding',
+          }
+        }))
+      }, 7000)
+
+    }, 14000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatTypingUser, setChatTypingUser] = useState<string | null>(null)
   const [lastSeenId, setLastSeenId] = useState<number | null>(null)
   const [muted, setMuted] = useState(false)
@@ -410,6 +661,7 @@ const App: React.FC = () => {
   // We store agents in a ref as well so animation callbacks can read them
   // without needing to be re-created every render.
   const agentsRef = useRef<Agent[]>([])
+  const keysDownRef = useRef<Set<string>>(new Set())
   agentsRef.current = agents
 
   // Pending side-effects: computed during state updater, flushed in useEffect
@@ -1343,6 +1595,15 @@ const App: React.FC = () => {
       const nowMs = Date.now()
       let changed = false
 
+      // Realtime 60FPS Keyboard movement calculation for Boss
+      let keyDx = 0
+      let keyDy = 0
+      if (keysDownRef.current.has('arrowup') || keysDownRef.current.has('w')) keyDy -= 1
+      if (keysDownRef.current.has('arrowdown') || keysDownRef.current.has('s')) keyDy += 1
+      if (keysDownRef.current.has('arrowleft') || keysDownRef.current.has('a')) keyDx -= 1
+      if (keysDownRef.current.has('arrowright') || keysDownRef.current.has('d')) keyDx += 1
+      const isKeyMoving = keyDx !== 0 || keyDy !== 0
+
       const next = prev.map(agent => {
         const meta = agentMetaRef.current.get(agent.id) ?? {
           spawnedAt: Date.now(),
@@ -1357,6 +1618,40 @@ const App: React.FC = () => {
 
         // Walk toward the first waypoint in the queue, or directly to the
         // final targetPosition if the queue is empty.
+        // If Boss is actively moved by keyboard, bypass pathQueue and step smoothly in direction
+        if (agent.id === BOSS_ID && isKeyMoving) {
+          const len = Math.hypot(keyDx, keyDy)
+          const stepSpeed = WALK_SPEED * dt * 1.6
+          const newX = Math.max(4, Math.min(96, agent.position.x + (keyDx / len) * stepSpeed))
+          const newY = Math.max(10, Math.min(92, agent.position.y + (keyDy / len) * stepSpeed))
+
+          let facing: any = agent.spriteFacing || 'front-right'
+          if (keyDy < 0 && keyDx >= 0) facing = 'rear-right'
+          else if (keyDy < 0 && keyDx < 0) facing = 'rear-left'
+          else if (keyDy >= 0 && keyDx < 0) facing = 'front-left'
+          else if (keyDy >= 0 && keyDx >= 0) facing = 'front-right'
+
+          changed = true
+          return {
+            ...agent,
+            position: { x: newX, y: newY },
+            targetPosition: { x: newX, y: newY },
+            spriteFacing: facing,
+            state: 'walking-to-desk' as const,
+            pathQueue: [],
+          }
+        }
+
+        // When user stops pressing keys, Boss stops walking and returns to idle/working
+        if (agent.id === BOSS_ID && !isKeyMoving && agent.state === 'walking-to-desk' && (agent.pathQueue?.length ?? 0) === 0 && Math.hypot(agent.position.x - agent.targetPosition.x, agent.position.y - agent.targetPosition.y) < 0.1) {
+          const atDesk = Math.hypot(agent.position.x - agent.deskPosition.x, agent.position.y - agent.deskPosition.y) < 1.5
+          changed = true
+          return {
+            ...agent,
+            state: atDesk ? ('working' as const) : ('idle' as const),
+          }
+        }
+
         const queue = agent.pathQueue ?? []
         const immediateTarget = queue.length > 0 ? queue[0] : agent.targetPosition
 
@@ -1398,7 +1693,11 @@ const App: React.FC = () => {
               Math.abs(agent.targetPosition.y - DOOR_TARGET.y) < ARRIVAL_THRESHOLD
             )
 
-            if (agent.state === 'new-hire' || agent.state === 'walking-to-desk') {
+            if (agent.id === BOSS_ID && arrived) {
+              const atDesk = Math.hypot(agent.targetPosition.x - agent.deskPosition.x, agent.targetPosition.y - agent.deskPosition.y) < 1.8
+              updated = { ...agent, position: agent.targetPosition, state: atDesk ? ('working' as const) : ('idle' as const) }
+              changed = true
+            } else if (agent.state === 'new-hire' || agent.state === 'walking-to-desk') {
               if (isAtDesk || agent.state === 'new-hire') {
                 meta.arrivedAtDeskAt = nowMs
                 meta.onBreak = false
@@ -1530,6 +1829,7 @@ const App: React.FC = () => {
       })
 
       if (changed || pruned.length !== next.length) {
+        agentsRef.current = pruned
         setAgents(pruned)
       }
 
@@ -1739,6 +2039,194 @@ const App: React.FC = () => {
 
   const [volume, setVolume] = useState(sfx.getVolume())
 
+  
+  // Player Controls (Boss Movement) & Follow Camera
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is currently typing in input or textarea
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+
+      if (e.key === 'd' || e.key === 'D') {
+        setIsDashboardOpen(prev => !prev)
+        return
+      }
+      if (e.key === ' ') {
+        e.preventDefault()
+        setSpotlightTargetId(BOSS_ID)
+        return
+      }
+      if ((e.key === 'e' || e.key === 'E') && nearbyAgent) {
+        setInspectingAgent(nearbyAgent)
+        return
+      }
+
+      const moveKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D']
+      if (moveKeys.includes(e.key)) {
+        setAgents(prev => prev.map(a => {
+          if (a.id !== BOSS_ID) return a
+          let dx = 0, dy = 0
+          let facing = a.spriteFacing || 'front-right'
+          if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { dy -= 1.2; facing = 'rear-right'; }
+          if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { dy += 1.2; facing = 'front-left'; }
+          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { dx -= 1.2; facing = 'front-left'; }
+          if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { dx += 1.2; facing = 'front-right'; }
+
+          const newX = Math.max(4, Math.min(96, a.position.x + dx))
+          const newY = Math.max(10, Math.min(92, a.position.y + dy))
+
+          return {
+            ...a,
+            position: { x: newX, y: newY },
+            targetPosition: { x: newX, y: newY },
+            spriteFacing: facing,
+            state: 'walking-to-desk', // Activates smooth walking animation
+          }
+        }))
+
+        // Return Boss to idle shortly after key release
+        setTimeout(() => {
+          setAgents(prev => prev.map(a => a.id === BOSS_ID ? { ...a, state: 'idle' } : a))
+        }, 180)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentRoomId, nearbyAgent])
+
+  // Check proximity between Boss and other agents in the same room
+  // Periodic authentic Indonesian tech & office banter loop (like TikTok reference)
+  useEffect(() => {
+    const CHATTER_LINES: Record<string, string[]> = {
+      'Claude': [
+        'Worktree bersih, commit push...',
+        'Optimasi query PostgreSQL mission...',
+        'Nunggu webhook payment Xendit...',
+        'Deploy cluster staging k8s aman',
+        'Review pull request API rules',
+      ],
+      'Rani': [
+        'Review backlog orderan misi lapangan',
+        'PRD modul KYC visual v2 siap',
+        'Sync koordinasi tim operasional',
+        'Cek analytics konversi misi',
+      ],
+      'Alya': [
+        'Testing API route orders pass 100%',
+        'Checking rules validation engine',
+        'Automated QA suite running...',
+        'Verifikasi payload fintech stabil',
+      ],
+      'Maya': [
+        'Render video green screen 4K selesai',
+        'Video promo BukainJalan tayang 18.00',
+        'Desain materi banner misi baru',
+        'Podcast interview mitra siap rilis',
+      ],
+      'Satria': [
+        'Mantap tim, push terus!',
+        'Cek dashboard divisi yang butuh saya',
+        'Briefing di meja meeting atas',
+        'BukainJalan HQ siap scale up!',
+      ],
+    }
+
+    const interval = setInterval(() => {
+      setAgents(prev => {
+        if (prev.length === 0) return prev
+        // Pick random agent
+        const randIdx = Math.floor(Math.random() * prev.length)
+        const target = prev[randIdx]
+        const lines = CHATTER_LINES[target.name] || [
+          'Standby monitoring tugas...',
+          'Kopi dulu sebentar...',
+          'Siap eksekusi sprint berikutnya',
+        ]
+        const randomLine = lines[Math.floor(Math.random() * lines.length)]
+        return prev.map((a, idx) => idx === randIdx ? { ...a, statusText: randomLine } : a)
+      })
+    }, 9000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const boss = agents.find(a => a.id === BOSS_ID && a.room === currentRoomId)
+    if (!boss) {
+      setNearbyAgent(null)
+      return
+    }
+    const otherInRoom = agents.find(a =>
+      a.id !== BOSS_ID &&
+      a.room === currentRoomId &&
+      Math.hypot(boss.position.x - a.position.x, boss.position.y - a.position.y) < 9
+    )
+    setNearbyAgent(otherInRoom || null)
+  }, [agents, currentRoomId])
+
+  // Click on floor to walk Boss
+  const handleFloorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = ((e.clientX - rect.left) / rect.width) * 100
+    const clickY = ((e.clientY - rect.top) / rect.height) * 100
+    setAgents(prev => prev.map(a => {
+      if (a.id !== BOSS_ID) return a
+      const facing = clickX < a.position.x ? 'front-left' : 'front-right'
+      return {
+        ...a,
+        targetPosition: { x: clickX, y: clickY },
+        spriteFacing: facing,
+        pathQueue: [],
+      }
+    }))
+  }
+
+  // Camera Spotlight panning
+  const spotlightAgent = agents.find(a => a.id === (spotlightTargetId || BOSS_ID) && a.room === currentRoomId)
+  const panX = spotlightAgent ? Math.max(-35, Math.min(35, (50 - spotlightAgent.position.x) * 1.5)) : 0
+  const panY = spotlightAgent ? Math.max(-25, Math.min(25, (50 - spotlightAgent.position.y) * 1.5)) : 0
+
+  const handleUpdateTaskStatus = (taskId: string, newStatus: TaskStatus, note?: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: Date.now(), decisionNote: note } : t))
+  }
+
+  const handleSpotlightAgent = (agentId: string, roomId: RoomId) => {
+    setCurrentRoomId(roomId)
+    setSpotlightTargetId(agentId)
+    setIsDashboardOpen(false)
+  }
+
+  const handleSummonToRoom = (agentId: string, targetRoom: RoomId) => {
+    const targetRoomDef = ROOMS[targetRoom]
+    const entry = targetRoomDef?.entryPoint || { x: 50, y: 70 }
+    setAgents(prev => prev.map(a => a.id === agentId ? { ...a, room: targetRoom, position: entry, targetPosition: entry } : a))
+  }
+
+  const handleAssignNewTask = (title: string, division: Division, priority: 'low' | 'medium' | 'high' | 'urgent') => {
+    const newTask: DivisionTask = {
+      id: `task-${Date.now()}`,
+      title,
+      division,
+      status: 'queued',
+      priority,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    setTasks(prev => [newTask, ...prev])
+  }
+
+  const handleSendMessage = useCallback((text: string, channel: string = 'office-general') => {
+    const bossCfg = AGENT_CONFIGS[BOSS_ROLE] ?? AGENT_CONFIGS['default']
+    addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color, text)
+    setAutoTypeText(undefined)
+    fetch('http://127.0.0.1:8788/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: bossCfg.title, text, channel }),
+    }).catch(() => {})
+  }, [addMsg])
+
   const handleToggleMute = useCallback(() => {
     const nowMuted = sfx.toggleMute()
     setMuted(nowMuted)
@@ -1769,7 +2257,27 @@ const App: React.FC = () => {
         <div className="title-bar-dot" style={{ background: '#ff5f57' }} />
         <div className="title-bar-dot" style={{ background: '#febc2e' }} />
         <div className="title-bar-dot" style={{ background: '#28c840' }} />
-        <span className="title-bar-text">🏢 GAIA OFFICE</span>
+                <span className="title-bar-text">🏢 GAIA VIRTUAL OFFICE</span>
+        <button
+          className="header-quick-action"
+          onClick={() => setIsDashboardOpen(true)}
+          title="Buka Executive Division Dashboard (Hotkey: D)"
+        >
+          📊 Dashboard Divisi (D)
+        </button>
+        <button
+          className={`header-quick-action ${spotlightTargetId === BOSS_ID ? 'active-spotlight' : ''}`}
+          onClick={() => {
+            const boss = agents.find(a => a.id === BOSS_ID)
+            if (boss) {
+              setCurrentRoomId(boss.room)
+              setSpotlightTargetId(BOSS_ID)
+            }
+          }}
+          title="Pusatkan Kamera ke Boss (Hotkey: Spasi)"
+        >
+          🎯 Follow Boss (Spasi)
+        </button>
         <button
           className="title-bar-daynight"
           onClick={() => setDayNightMode(prev =>
@@ -1777,7 +2285,7 @@ const App: React.FC = () => {
           )}
           title={`Mode: ${dayNightMode}`}
         >
-          {dayNightMode === 'auto' ? 'AUTO' : dayNightMode === 'day' ? 'DAY' : 'NIGHT'}
+          {dayNightMode === 'auto' ? '⏰ AUTO (WIB)' : dayNightMode === 'day' ? '☀️ DAY' : '🌙 NIGHT'}
         </button>
         <span className="title-bar-phase">{getPhaseLabel(effectivePhase)}</span>
       </div>
@@ -1785,28 +2293,56 @@ const App: React.FC = () => {
       <div className="app-body">
       <div className="office-view">
         <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {/* Room Navigation Bar */}
+                    {/* Office Zone Fast-Travel Navigation Bar */}
           <div className="room-nav">
-            {Object.entries(ROOMS).filter(([id]) => id !== currentRoomId).map(([id, room]) => (
-              <button
-                key={id}
-                className="room-nav-btn"
-                onClick={() => setCurrentRoomId(id as RoomId)}
-              >
-                {room.name}
-              </button>
-            ))}
+            {OFFICE_ZONES.map(zone => {
+              const isActive = activeZoneId === zone.id
+              const count = zone.id === 'overview'
+                ? agents.length
+                : agents.filter(a => Math.hypot(a.position.x - zone.x, a.position.y - zone.y) < 18).length
+
+              return (
+                <button
+                  key={zone.id}
+                  className={`room-nav-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => handleZoneClick(zone)}
+                  title={`Fast-travel kamera ke ${zone.name}`}
+                >
+                  <span>{zone.emoji}</span>
+                  <span>{zone.name}</span>
+                  {count > 0 && <span className="room-badge-pill">{count}</span>}
+                </button>
+              )
+            })}
           </div>
 
           {/* Room View */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '8px' }} className="office-viewport-container">
           <div
+            className="office-world-camera"
+            style={{
+              transform: `scale(${spotlightTargetId === BOSS_ID ? 1.35 : cameraTarget.zoom})`,
+              transformOrigin: `${spotlightTargetId === BOSS_ID && spotlightAgent ? spotlightAgent.position.x : cameraTarget.x}% ${spotlightTargetId === BOSS_ID && spotlightAgent ? spotlightAgent.position.y : cameraTarget.y}%`,
+              transition: 'transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform-origin 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+            }}
+          >
+          <div
+            onClick={handleFloorClick}
             className={`room-container${flickering ? ' flickering' : ''}`}
             style={{
-              aspectRatio: '4800/3584',
-              width: '100%',
+              aspectRatio: '1024/572',
               maxHeight: '100%',
+              maxWidth: '100%',
+              width: 'auto',
+              height: '100%',
               position: 'relative',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              borderRadius: '6px',
             }}
           >
             {/* Room backgrounds — both rendered, night crossfades via opacity. Theme swaps source art. */}
@@ -1824,25 +2360,29 @@ const App: React.FC = () => {
               }}
             />
 
-            {/* Furniture — apply interactive state overrides */}
-            <FurnitureRenderer onItemClick={handleFurnitureClick} items={MAIN_ROOM.furniture.map(item => {
-              const stateOverride = furnitureStates[item.id]
-              if (!stateOverride) return item
-              if (item.id === 'coffee' && stateOverride === 'on') {
-                return { ...item, sprite: 'coffee-on' }
-              }
-              if (item.id === 'filing-1' && stateOverride === 'open') {
-                return { ...item, sprite: 'filing-open' }
-              }
-              if (item.id === 'printer-1' && stateOverride === 'broken') {
-                return { ...item, sprite: 'printer-broken' }
-              }
-              return item
-            })} />
+                        {/* Furniture - Dynamic per Room with interactive state overrides */}
+            <FurnitureRenderer
+              onItemClick={handleFurnitureClick}
+              items={(ROOMS[currentRoomId]?.furniture || []).map(item => {
+                const stateOverride = furnitureStates[item.id]
+                if (!stateOverride) return item
+                if (item.id === 'coffee' && stateOverride === 'on') {
+                  return { ...item, sprite: 'coffee-on' }
+                }
+                if (item.id === 'filing-1' && stateOverride === 'open') {
+                  return { ...item, sprite: 'filing-open' }
+                }
+                if (item.id === 'printer-1' && stateOverride === 'broken') {
+                  return { ...item, sprite: 'printer-broken' }
+                }
+                return item
+              })}
+            />
 
-            {/* Agents */}
-            {agents.map(agent => {
-              const spot = MAIN_ROOM.agentSpots.find(s => s.id === agent.assignedSpotId)
+            {/* Agents - Filtered by current room and clickable to inspect */}
+            {agents.filter(a => a.room === currentRoomId).map(agent => {
+              const activeRoomSpots = ROOMS[currentRoomId]?.agentSpots || []
+              const spot = activeRoomSpots.find(s => s.id === agent.assignedSpotId)
               const atDesk = Math.abs(agent.position.x - agent.deskPosition.x) < 1 &&
                              Math.abs(agent.position.y - agent.deskPosition.y) < 1
               const zOverride = atDesk && spot?.zIndex ? spot.zIndex : undefined
@@ -1860,9 +2400,30 @@ const App: React.FC = () => {
                   idleDurationMs={idleDurationMs}
                   zIndex={zOverride}
                   isTyping={typingAgents.has(agent.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInspectingAgent(agent)
+                  }}
                 />
               )
             })}
+
+            {/* Proximity Action Prompt for Boss */}
+            {nearbyAgent && nearbyAgent.room === currentRoomId && (
+              <div
+                className="player-proximity-prompt"
+                style={{
+                  left: `${nearbyAgent.position.x}%`,
+                  top: `${nearbyAgent.position.y - 4}%`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setInspectingAgent(nearbyAgent)
+                }}
+              >
+                💬 [E] Ngobrol dengan {nearbyAgent.name}
+              </div>
+            )}
 
             {/* Angela's cat — follows whoever is cast as Angela in Office theme */}
             {(() => {
@@ -1920,6 +2481,7 @@ const App: React.FC = () => {
             <div className={`day-overlay ${effectivePhase}`} />
           </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -1929,17 +2491,7 @@ const App: React.FC = () => {
         volume={volume}
         onToggleMute={handleToggleMute}
         onVolumeChange={handleVolumeChange}
-        onSendMessage={(text) => {
-          const bossCfg = AGENT_CONFIGS[BOSS_ROLE] ?? AGENT_CONFIGS['default']
-          addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color, text)
-          setAutoTypeText(undefined)
-          // Send to server so Claude can read it
-          fetch('http://127.0.0.1:8788/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sender: bossCfg.title, text }),
-          }).catch(() => {})
-        }}
+        onSendMessage={handleSendMessage}
         autoTypeText={autoTypeText}
         dayPhase={effectivePhase}
         typingUser={chatTypingUser}
@@ -1951,6 +2503,28 @@ const App: React.FC = () => {
         }}
       />
       </div>
+
+      {/* Division Workflow Kanban Dashboard */}
+      <DivisionDashboard
+        isOpen={isDashboardOpen}
+        onClose={() => setIsDashboardOpen(false)}
+        tasks={tasks}
+        agents={agents}
+        onUpdateTaskStatus={handleUpdateTaskStatus}
+        onSpotlightAgent={handleSpotlightAgent}
+        onAssignNewTask={handleAssignNewTask}
+      />
+
+      {/* Agent Inspector Modal */}
+      <AgentInspectorModal
+        agent={inspectingAgent}
+        onClose={() => setInspectingAgent(null)}
+        currentRoomId={currentRoomId}
+        onSummonToRoom={handleSummonToRoom}
+        onDirectChat={(agentName) => {
+          handleSendMessage(`@${agentName} `, 'office-general')
+        }}
+      />
     </div>
   )
 }

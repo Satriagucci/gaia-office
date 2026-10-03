@@ -4,11 +4,9 @@ import { getSpritePath, useTheme, toggleTheme, getTheme, themedDisplayName } fro
 
 function getAvatarSrc(role: string, agentId?: string): string {
   const charBase = ROLE_TO_CHAR[role] ?? 'employee-3'
-  // Why: avatars in chat use agent.id when available so Office casting stays consistent
   return getSpritePath(agentId ?? `role-${role}`, role, charBase, 'front-right')
 }
 
-// Proactive message detection: agent announcements about starting/completing work
 const PROACTIVE_PATTERN = /\b(starting|started|done|finished|completed|ready|working on|picking up|taking over)\b/i
 
 export interface ChatMessage {
@@ -23,7 +21,15 @@ export interface ChatMessage {
   reactions?: string[]
 }
 
-const EMOJI_PICKER = ['👍', '👎', '😊', '🎉', '😡', '🔥', '💯']
+const EMOJI_PICKER = ['👍', '🚀', '☕', '❤️', '🔥', '👀', '🎉']
+
+export type ChatChannel = 'office-general' | 'dev-ops' | 'incidents'
+
+const CHANNELS: { id: ChatChannel; label: string; icon: string }[] = [
+  { id: 'office-general', label: 'general', icon: '#' },
+  { id: 'dev-ops', label: 'dev-ops', icon: '💻' },
+  { id: 'incidents', label: 'incidents', icon: '🚨' },
+]
 
 interface SlackChatProps {
   messages: ChatMessage[]
@@ -31,29 +37,38 @@ interface SlackChatProps {
   volume: number
   onToggleMute: () => void
   onVolumeChange: (v: number) => void
-  onSendMessage?: (text: string) => void
+  onSendMessage?: (text: string, channel?: string) => void
   onReaction?: (messageId: number, reactions: string[]) => void
-  /** For video mode: auto-type text into the input box */
   autoTypeText?: string
   dayPhase: string
-  /** Role/name currently typing — shows animated dots below the message list */
   typingUser?: string | null
-  /** ID of the last message seen by the assistant — renders a tiny seen avatar */
   lastSeenId?: number | null
 }
 
-const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggleMute, onVolumeChange, onSendMessage, onReaction, autoTypeText, dayPhase, typingUser, lastSeenId }) => {
+const SlackChat: React.FC<SlackChatProps> = ({
+  messages,
+  muted,
+  volume,
+  onToggleMute,
+  onVolumeChange,
+  onSendMessage,
+  onReaction,
+  autoTypeText,
+  dayPhase,
+  typingUser,
+  lastSeenId,
+}) => {
   const theme = useTheme()
-  void theme // Why: subscribe so avatars re-render when /the-office toggles
+  void theme
   const bodyRef = useRef<HTMLDivElement>(null)
   const [inputText, setInputText] = useState('')
+  const [activeChannel, setActiveChannel] = useState<ChatChannel>('office-general')
   const [showSlashHint, setShowSlashHint] = useState(false)
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<number | null>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   const onSendRef = useRef(onSendMessage)
   onSendRef.current = onSendMessage
 
-  // Close emoji picker on click outside
   useEffect(() => {
     if (emojiPickerMsgId === null) return
     const handler = (e: MouseEvent) => {
@@ -74,10 +89,8 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
     setEmojiPickerMsgId(null)
   }, [onReaction])
 
-  // Cron/chat-monitor pause toggle
   const [cronPaused, setCronPaused] = useState(false)
 
-  // Load initial state from server
   useEffect(() => {
     fetch('http://127.0.0.1:8788/chat/cron-state')
       .then(r => r.json())
@@ -88,7 +101,6 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
   const toggleCron = useCallback(() => {
     const newState = !cronPaused
     setCronPaused(newState)
-    // Update the state file via a simple POST
     fetch('http://127.0.0.1:8788/chat/cron-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,7 +108,6 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
     }).catch(() => {})
   }, [cronPaused])
 
-  // Auto-type effect for video mode
   useEffect(() => {
     if (!autoTypeText) {
       setInputText('')
@@ -110,58 +121,84 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
         setInputText(autoTypeText.slice(0, i))
       } else {
         clearInterval(interval)
-        // Auto-send after typing finishes
         setTimeout(() => {
-          onSendRef.current?.(autoTypeText)
+          onSendRef.current?.(autoTypeText, activeChannel)
           setInputText('')
         }, 400)
       }
-    }, 50 + Math.random() * 30) // slightly random typing speed
+    }, 50 + Math.random() * 30)
     return () => clearInterval(interval)
-  }, [autoTypeText])
+  }, [autoTypeText, activeChannel])
 
   useEffect(() => {
     if (bodyRef.current) {
       bodyRef.current.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' })
     }
-  }, [messages, typingUser])
+  }, [messages, typingUser, activeChannel])
 
-  const displayed = messages.slice(-12)
+  // Filter messages based on active channel
+  const filteredMessages = messages.filter(m => {
+    if (m.isSystem) return true
+    if (!m.channel || m.channel === 'office-general') {
+      return activeChannel === 'office-general'
+    }
+    return m.channel === activeChannel
+  })
+
+  const displayed = filteredMessages.slice(-20)
   const onlineCount = new Set(messages.slice(-20).filter(m => !m.isSystem).map(m => m.sender)).size
 
   return (
     <div className="slack-panel">
-      <div className="slack-header">
-        <div className="slack-channel-icon">#</div>
-        <span className="slack-channel-name">office-general</span>
-        <div className="slack-header-right">
-          <div className="slack-online-dot" />
-          <span className="slack-online-count">{onlineCount}</span>
-          <div
-            className={`slack-cron-toggle ${cronPaused ? 'paused' : 'active'}`}
-            onClick={toggleCron}
-            title={cronPaused ? 'Chat monitor paused — click to resume' : 'Chat monitor active — click to pause'}
-          >
-            <div className="slack-cron-track">
-              <div className="slack-cron-thumb" />
-            </div>
-            <span className="slack-cron-label">{cronPaused ? 'AI Off' : 'AI On'}</span>
+      {/* Header with Channel Tabs */}
+      <div className="slack-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {CHANNELS.map(ch => (
+              <button
+                key={ch.id}
+                onClick={() => setActiveChannel(ch.id)}
+                style={{
+                  background: activeChannel === ch.id ? 'white' : 'transparent',
+                  border: activeChannel === ch.id ? '1px solid #90caf9' : '1px solid transparent',
+                  borderRadius: 4,
+                  padding: '3px 8px',
+                  fontSize: 11,
+                  fontWeight: activeChannel === ch.id ? 700 : 500,
+                  color: activeChannel === ch.id ? '#0d47a1' : '#5a5a7a',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <span>{ch.icon}</span>
+                <span>{ch.label}</span>
+              </button>
+            ))}
           </div>
-          <button className="slack-mute-btn" onClick={onToggleMute}>
-            {muted ? '🔇' : volume < 0.4 ? '🔈' : '🔊'}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={Math.round(volume * 100)}
-            onChange={e => onVolumeChange(Number(e.target.value) / 100)}
-            className="slack-volume-slider"
-            title={`Volume: ${Math.round(volume * 100)}%`}
-          />
+
+          <div className="slack-header-right">
+            <div className="slack-online-dot" />
+            <span className="slack-online-count">{onlineCount}</span>
+            <div
+              className={`slack-cron-toggle ${cronPaused ? 'paused' : 'active'}`}
+              onClick={toggleCron}
+              title={cronPaused ? 'Chat monitor paused — click to resume' : 'Chat monitor active — click to pause'}
+            >
+              <div className="slack-cron-track">
+                <div className="slack-cron-thumb" />
+              </div>
+              <span className="slack-cron-label">{cronPaused ? 'AI Off' : 'AI On'}</span>
+            </div>
+            <button className="slack-mute-btn" onClick={onToggleMute} title={muted ? 'Unmute' : 'Mute'}>
+              {muted ? '🔇' : volume < 0.4 ? '🔉' : '🔊'}
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Messages list */}
       <div className="slack-body" ref={bodyRef}>
         {displayed.map((msg) => {
           const isProactive = !msg.isSystem && PROACTIVE_PATTERN.test(msg.text)
@@ -206,7 +243,7 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
                           key={i}
                           className="slack-reaction"
                           onClick={() => handleReaction(msg, r)}
-                          title="Click to remove"
+                          title="Klik untuk menghapus reaksi"
                         >{r}</span>
                       ))}
                     </div>
@@ -259,7 +296,7 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
           <input
             type="text"
             className="slack-input-field"
-            placeholder="Message #office-general"
+            placeholder={`Ketik pesan di #${activeChannel}...`}
             value={inputText}
             onChange={e => {
               const val = e.target.value
@@ -273,13 +310,12 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
               }
               if (e.key === 'Enter' && inputText.trim()) {
                 const trimmed = inputText.trim()
-                // Client-side slash commands — not sent to backend
                 if (trimmed === '/the-office' || trimmed === '/theoffice') {
                   toggleTheme()
                   const nowOn = getTheme() === 'office'
-                  onSendMessage?.(nowOn ? '🧻 Dunder Mifflin mode: ON. Identity theft is not a joke.' : '🔁 Office theme: OFF')
+                  onSendMessage?.(nowOn ? '👔 Dunder Mifflin mode: ON.' : '🏢 Office theme: OFF', activeChannel)
                 } else {
-                  onSendMessage?.(trimmed)
+                  onSendMessage?.(trimmed, activeChannel)
                 }
                 setInputText('')
                 setShowSlashHint(false)

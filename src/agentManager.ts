@@ -351,13 +351,13 @@ export function waterMessage(): string  { return themedWater() }
 // ---------------------------------------------------------------------------
 
 /** Minimum time at desk before a coffee/water break can trigger (ms) */
-export const BREAK_MIN_DESK_TIME = 20_000
+export const BREAK_MIN_DESK_TIME = 6_000
 /** Probability per second of initiating a break while at desk */
-export const BREAK_CHANCE_PER_SEC = 0.008
+export const BREAK_CHANCE_PER_SEC = 0.04
 /** How long agent waits at the break spot before returning (ms) */
-export const BREAK_DURATION = 8_000
+export const BREAK_DURATION = 7_000
 /** Walking speed in %-units per frame at 60fps */
-export const WALK_SPEED = 0.08
+export const WALK_SPEED = 0.32
 
 // ---------------------------------------------------------------------------
 // Agent creation helper

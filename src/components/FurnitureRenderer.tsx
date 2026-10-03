@@ -8,14 +8,17 @@ interface FurnitureRendererProps {
 }
 
 function resolveSpriteUrl(sprite: string): string | null {
+  if (!sprite || sprite === 'hotspot' || sprite === 'none') return null
   // Direct asset key lookup
   if (ASSETS[sprite]) return ASSETS[sprite].path
 
-  // Legacy sprite-sheet format "sheet-name:frame" — no image available
+  // Legacy sprite-sheet format "sheet-name:frame" - no image available
   if (sprite.includes(':')) return null
 
-  // Try as direct path
-  return sprite
+  // Direct path if starting with slash or dot
+  if (sprite.startsWith('/') || sprite.startsWith('./')) return sprite
+
+  return null
 }
 
 function getSpriteHeight(sprite: string): number {
@@ -27,7 +30,7 @@ function getSpriteHeight(sprite: string): number {
 const CLICKABLE_TYPES = new Set([
   'coffee-machine', 'filing-cabinet', 'printer',
   'plant-monstera', 'plant-snake', 'plant-money',
-  'hotspot',
+  'hotspot', 'bell', 'tv-monitor',
 ])
 
 const FurnitureRenderer: React.FC<FurnitureRendererProps> = ({ items, onItemClick }) => {
@@ -36,8 +39,8 @@ const FurnitureRenderer: React.FC<FurnitureRendererProps> = ({ items, onItemClic
       {items.map(item => {
         const clickable = CLICKABLE_TYPES.has(item.type) || item.interactive
 
-        // Hotspots — invisible clickable zones over background art
-        if (item.type === 'hotspot') {
+        // Hotspots - invisible clickable zones over background art (no img tag)
+        if (item.type === 'hotspot' || item.sprite === 'hotspot') {
           return (
             <div
               key={item.id}
@@ -84,13 +87,11 @@ const FurnitureRenderer: React.FC<FurnitureRendererProps> = ({ items, onItemClic
               src={url}
               alt={item.label || item.type}
               style={{
-                height: h,
+                height: `${h}px`,
                 width: 'auto',
                 imageRendering: 'pixelated',
                 display: 'block',
-                filter: 'drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000)',
               }}
-              draggable={false}
             />
           </div>
         )

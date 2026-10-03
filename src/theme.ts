@@ -140,23 +140,14 @@ export function getSpritePath(_agentId: string, role: string, defaultBase: strin
 
 /** Map RoomId to background image path */
 const ROOM_IMAGES: Record<string, { day: string; night: string }> = {
-  'main-office':   { day: '/rooms/office-day.png', night: '/rooms/office-night.png' },
-  'manager-office':{ day: '/rooms/ceo-office.png', night: '/rooms/ceo-office.png' },
-  'ceo-office':    { day: '/rooms/ceo-office.png', night: '/rooms/ceo-office.png' },
-  'meeting-room':  { day: '/rooms/meeting-room.png', night: '/rooms/meeting-room.png' },
-  'kitchen':       { day: '/rooms/kitchen-cafeteria.png', night: '/rooms/kitchen-cafeteria.png' },
-  'server-room':   { day: '/rooms/server-room.png', night: '/rooms/server-room.png' },
-  'lobby':         { day: '/rooms/lobby-reception.png', night: '/rooms/lobby-reception.png' },
-  'nap-room':      { day: '/rooms/nap-wellness-room.png', night: '/rooms/nap-wellness-room.png' },
-  'rooftop':       { day: '/rooms/rooftop-terrace.png', night: '/rooms/rooftop-terrace.png' },
-  'gym':           { day: '/rooms/gym-fitness-room.png', night: '/rooms/gym-fitness-room.png' },
-  'parking':       { day: '/rooms/parking-garage.png', night: '/rooms/parking-garage.png' },
+  'main-office': { day: '/master-map.png', night: '/master-map-night.png' },
 }
 
-export function getRoomImage(roomId: string, phase: 'day' | 'night'): string {
-  const room = ROOM_IMAGES[roomId]
-  if (room) return phase === 'night' ? room.night : room.day
-  return phase === 'night' ? '/rooms/office-night.png' : '/rooms/office-day.png'
+export function getRoomImage(_roomId?: string, phase?: 'day' | 'night'): string {
+  if (phase === 'night') {
+    return '/master-map-night.png'
+  }
+  return '/master-map.png'
 }
 
 /** Returns the ROLE currently cast as Angela (if any), plus cat sprite path. */

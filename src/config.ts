@@ -1,18 +1,20 @@
-/**
+﻿/**
  * config.ts — shared configuration constants
- *
  * Reads boss settings from office.config.json in the project root.
- * Users can customise their boss name, sprite, and colour there.
  */
 
-// Load user config (office.config.json) — bundled by Vite
-let userConfig: { boss?: { name?: string; sprite?: string; color?: string; emoji?: string } } = {}
-try {
-  // Vite handles JSON imports at build time
-  userConfig = await import('../office.config.json')
-} catch {
-  // Fallback defaults if file missing
+import rawConfig from '../office.config.json'
+
+interface OfficeConfig {
+  boss?: {
+    name?: string
+    sprite?: string
+    color?: string
+    emoji?: string
+  }
 }
+
+const userConfig = (rawConfig ?? {}) as OfficeConfig
 
 const bossName   = userConfig.boss?.name   ?? 'Boss'
 const bossSprite = userConfig.boss?.sprite ?? 'Me-1'
@@ -29,7 +31,7 @@ export const BOSS_EMOJI = bossEmoji
 // Map agent roles to character sprite base names (in /sprites/characters/)
 export const ROLE_TO_CHAR: Record<string, string> = {
   'boss':                  bossSprite,
-  // GAIA Office Team — karakter wanita
+  // GAIA Office Team
   'concierge':             'kelly-kapoor',
   'devops':                'angela-martin',
   'data-analyst':          'phyllis-vance',

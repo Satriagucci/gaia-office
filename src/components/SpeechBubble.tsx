@@ -6,7 +6,7 @@ interface SpeechBubbleProps {
   duration?: number
 }
 
-const SpeechBubble: React.FC<SpeechBubbleProps> = ({ text, isManager = false, duration = 3000 }) => {
+const SpeechBubble: React.FC<SpeechBubbleProps> = ({ text, isManager = false, duration = 6500 }) => {
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -15,11 +15,11 @@ const SpeechBubble: React.FC<SpeechBubbleProps> = ({ text, isManager = false, du
     return () => clearTimeout(timer)
   }, [text, duration])
 
-  if (!visible) return null
+  if (!visible || !text) return null
 
   return (
     <div className={`speech-bubble${isManager ? ' manager-bubble' : ''}`}>
-      {text}
+      <span className="bubble-text">{text}</span>
     </div>
   )
 }

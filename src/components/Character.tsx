@@ -16,6 +16,7 @@ interface CharacterProps {
   zIndex?: number
   /** Show typing indicator (about to post a Slack message) */
   isTyping?: boolean
+  onClick?: (e: React.MouseEvent) => void
 }
 
 // Movement direction → sprite variant
@@ -55,7 +56,7 @@ function getAnimState(state: AgentState): string {
 
 // Speech bubble only shown briefly when statusText changes (like posting to Slack)
 function shouldShowBubble(state: AgentState): boolean {
-  return state === 'talking-to-manager'
+  return state !== 'completed' && state !== 'changing-room'
 }
 
 // Opposite direction for random "looking around"
@@ -66,7 +67,7 @@ const OPPOSITE: Record<SpriteDirection, SpriteDirection> = {
   'rear-right': 'front-left',
 }
 
-const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex, isTyping }) => {
+const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex, isTyping, onClick }) => {
   const prevPosRef = useRef({ x: agent.position.x, y: agent.position.y })
   const directionRef = useRef<SpriteDirection>(agent.spriteFacing ?? 'front-right')
   const [turnedAround, setTurnedAround] = useState(false)
@@ -77,10 +78,11 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
   // Calculate movement direction when walking
   const dx = agent.position.x - prevPosRef.current.x
   const dy = agent.position.y - prevPosRef.current.y
+  const isPhysicallyMoving = Math.abs(dx) > 0.003 || Math.abs(dy) > 0.003
 
-  if (isMoving && (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005)) {
+  if ((isMoving || isPhysicallyMoving) && (Math.abs(dx) > 0.003 || Math.abs(dy) > 0.003)) {
     directionRef.current = getDirectionFromDelta(dx, dy)
-  } else if (!isMoving && agent.spriteFacing) {
+  } else if (!isMoving && !isPhysicallyMoving && agent.spriteFacing) {
     // At a spot — use the spot's facing direction (or opposite if turned around)
     directionRef.current = turnedAround ? OPPOSITE[agent.spriteFacing] : agent.spriteFacing
   }
@@ -121,19 +123,34 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
     }
   }, [agent.state])
 
-  const animState = getAnimState(agent.state)
+  const distToDesk = Math.hypot(agent.position.x - agent.deskPosition.x, agent.position.y - agent.deskPosition.y)
+  const isWalking = isPhysicallyMoving || agent.state === 'walking-to-desk' || agent.state === 'new-hire' || (agent.state === 'coffee-break' && Math.hypot(agent.position.x - agent.targetPosition.x, agent.position.y - agent.targetPosition.y) > 0.5)
+  const isSitting = distToDesk < 1.5 && !isWalking && agent.state === 'working'
+  const animState = isWalking ? 'walking' : getAnimState(agent.state)
+
   const charBase = getCharBase(agent.role)
   const theme = useTheme() // Why: re-render on theme toggle so sprite path updates
   const spriteSrc = getSpritePath(agent.id, agent.role, charBase, directionRef.current)
   void theme
+  const showChair = isSitting && agent.role !== 'test-engineer' && agent.role !== 'concierge'
 
-  const effectSrc = isTyping
+  const isDevWorking = isSitting && (agent.role === 'assistant' || agent.role === 'devops')
+  const effectSrc = isTyping || isDevWorking
     ? '/sprites/effects/typing.png'
     : getEffect(agent.state, idleDurationMs, agent.statusText, agent.id, agent.task, agent.role)
 
+  const ROLE_ACTIVITIES: Record<string, { label: string; icon: string; color: string }> = {
+    'boss':             { label: 'CEO · Monitoring HQ', icon: '👑', color: '#f59e0b' },
+    'assistant':        { label: 'Lead Dev · Coding & DB', icon: '💻', color: '#0ea5e9' },
+    'devops':           { label: 'Product · Review Misi', icon: '📋', color: '#8b5cf6' },
+    'concierge':        { label: 'Ops · KYC & Webhook', icon: '⚡', color: '#f43f5e' },
+    'test-engineer':    { label: 'Creator · Studio 4K', icon: '🎬', color: '#10b981' },
+  }
+  const activity = ROLE_ACTIVITIES[agent.role]
+
   return (
     <div
-      className={`character-wrapper state-${animState}`}
+      className={`character-wrapper state-${animState} ${isSitting ? 'is-sitting' : ''} ${isWalking ? 'is-walking' : ''}`}
       style={{
         left: `${agent.position.x}%`,
         top: `${agent.position.y}%`,
@@ -141,6 +158,15 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
         zIndex: zIndex ?? Math.round(agent.position.y),
       }}
     >
+      {/* Dynamic Activity Overhead Pill */}
+      {activity && !shouldShowBubble(agent.state) && (
+        <div className="char-activity-badge" style={{ borderColor: `${activity.color}66` }}>
+          <span className="badge-pulse-dot" style={{ background: activity.color, boxShadow: `0 0 6px ${activity.color}` }} />
+          <span>{activity.icon}</span>
+          <span>{activity.label}</span>
+        </div>
+      )}
+
       {effectSrc && <EffectBubble src={effectSrc} alt={agent.state} />}
 
       {shouldShowBubble(agent.state) && agent.statusText && (
@@ -149,12 +175,21 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
 
       <div className="char-body-group">
         <div className="char-shadow" />
+        {showChair && (
+          <img
+            src={`/sprites/furniture/chair-${directionRef.current === 'front-left' || directionRef.current === 'rear-left' ? 'front-left' : 'front-right'}.png`}
+            alt="chair"
+            className="char-chair-sprite"
+            draggable={false}
+          />
+        )}
+        {isSitting && <div className="char-desk-glow" />}
         <img
           src={spriteSrc}
           alt={agent.name}
           className="char-sprite"
           style={{
-            height: agent.id.startsWith('boss-') ? 85 : 78,
+            height: agent.id.startsWith('boss-') ? 48 : 42,
             width: 'auto',
             filter: `drop-shadow(0 0 1px ${agent.color}) drop-shadow(0 0 0.5px #000)`,
             animationDelay: `${(agent.id.charCodeAt(0) * 0.37) % 3}s`,

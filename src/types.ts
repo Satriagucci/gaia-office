@@ -1,4 +1,4 @@
-import type { RoomId } from './rooms'
+﻿import type { RoomId } from './rooms'
 
 export type AgentState =
   | 'idle'
@@ -35,6 +35,37 @@ export interface Agent {
   emoji: string
   hiredAt: number
   pathQueue?: { x: number; y: number }[]  // waypoints to walk through
+  isPlayer?: boolean        // true if controlled by the user
+}
+
+export type Division =
+  | 'core_product'
+  | 'engineering'
+  | 'qa_security'
+  | 'devops'
+  | 'operations'
+
+export type TaskStatus =
+  | 'needs_boss'
+  | 'in_progress'
+  | 'queued'
+  | 'parked'
+  | 'discard_proposed'
+
+export interface DivisionTask {
+  id: string
+  title: string
+  description?: string
+  division: Division
+  status: TaskStatus
+  assignedAgentId?: string
+  assignedAgentName?: string
+  assignedAgentRole?: string
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  createdAt: number
+  updatedAt: number
+  decisionNote?: string
+  toolCall?: string
 }
 
 export interface OfficeEvent {
@@ -49,22 +80,22 @@ export interface OfficeEvent {
 
 import { BOSS_NAME, BOSS_COLOR, BOSS_EMOJI } from './config'
 
-export const AGENT_CONFIGS: Record<string, { color: string; emoji: string; title: string }> = {
-  // GAIA — CEO, configured via office.config.json
-  'boss':                  { color: BOSS_COLOR, emoji: BOSS_EMOJI, title: BOSS_NAME },
-  // GAIA Office Team — wanita semua
-  'concierge':             { color: '#f43f5e', emoji: '🌟', title: 'Alya' },
-  'devops':                { color: '#8b5cf6', emoji: '⚙️', title: 'Rani' },
-  'data-analyst':          { color: '#10b981', emoji: '📊', title: 'Dina' },
-  'scribe':                { color: '#f59e0b', emoji: '📝', title: 'Laras' },
-  // Subagents (existing — tetap ada untuk kompatibilitas)
-  'debugger':              { color: '#e74c3c', emoji: '🔍', title: 'Debugger' },
-  'code-reviewer':         { color: '#3498db', emoji: '📋', title: 'Reviewer' },
-  'frontend-developer':    { color: '#2ecc71', emoji: '🎨', title: 'Frontend' },
-  'fullstack-developer':   { color: '#9b59b6', emoji: '⚡', title: 'Fullstack' },
-  'test-engineer':         { color: '#f39c12', emoji: '🧪', title: 'Tester' },
-  'security-auditor':      { color: '#e67e22', emoji: '🛡️', title: 'Security' },
-  'devops-engineer':       { color: '#607d8b', emoji: '🔧', title: 'DevOps' },
-  'assistant':             { color: '#0ea5e9', emoji: '💙', title: 'GAIA' },
-  'default':               { color: '#95a5a6', emoji: '👤', title: 'Worker' },
+export const AGENT_CONFIGS: Record<string, { color: string; emoji: string; title: string; defaultRoom: RoomId; division: Division }> = {
+  // GAIA — CEO / Boss, configured via office.config.json
+  'boss':                  { color: BOSS_COLOR, emoji: BOSS_EMOJI, title: BOSS_NAME, defaultRoom: 'main-office', division: 'core_product' },
+  // GAIA Office Team
+  'concierge':             { color: '#f43f5e', emoji: '💁', title: 'Alya', defaultRoom: 'main-office', division: 'operations' },
+  'devops':                { color: '#8b5cf6', emoji: '⚙️', title: 'Rani', defaultRoom: 'main-office', division: 'devops' },
+  'data-analyst':          { color: '#10b981', emoji: '📊', title: 'Dina', defaultRoom: 'main-office', division: 'operations' },
+  'scribe':                { color: '#f59e0b', emoji: '📝', title: 'Laras', defaultRoom: 'main-office', division: 'operations' },
+  // Subagents
+  'debugger':              { color: '#e74c3c', emoji: '🐛', title: 'Debugger', defaultRoom: 'main-office', division: 'engineering' },
+  'code-reviewer':         { color: '#3498db', emoji: '🔍', title: 'Reviewer', defaultRoom: 'main-office', division: 'engineering' },
+  'frontend-developer':    { color: '#2ecc71', emoji: '🎨', title: 'Frontend', defaultRoom: 'main-office', division: 'engineering' },
+  'fullstack-developer':   { color: '#9b59b6', emoji: '💻', title: 'Fullstack', defaultRoom: 'main-office', division: 'engineering' },
+  'test-engineer':         { color: '#f39c12', emoji: '🧪', title: 'Tester', defaultRoom: 'main-office', division: 'qa_security' },
+  'security-auditor':      { color: '#e67e22', emoji: '🛡️', title: 'Security', defaultRoom: 'main-office', division: 'qa_security' },
+  'devops-engineer':       { color: '#607d8b', emoji: '🚀', title: 'DevOps', defaultRoom: 'main-office', division: 'devops' },
+  'assistant':             { color: '#0ea5e9', emoji: '🤖', title: 'GAIA', defaultRoom: 'main-office', division: 'core_product' },
+  'default':               { color: '#95a5a6', emoji: '💼', title: 'Worker', defaultRoom: 'main-office', division: 'engineering' },
 }
