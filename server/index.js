@@ -243,9 +243,14 @@ app.get('/screenshots/:scenario/delete', (req, res) => {
 
 app.get('/screenshots/:scenario/delete-file', (req, res) => {
   const scenario = decodeURIComponent(req.params.scenario)
-  const file = req.query?.file
-  if (!file || !file.endsWith('.png')) return res.redirect(`/screenshots/${encodeURIComponent(scenario)}`)
-  try { unlinkSync(join(SCREENSHOTS_DIR, scenario, file)) } catch {}
+  const rawFile = req.query?.file
+  const file = rawFile ? decodeURIComponent(rawFile) : null
+  if (file && file.endsWith('.png')) {
+    try { unlinkSync(join(SCREENSHOTS_DIR, scenario, file)) } catch {}
+  }
+  if (req.headers.accept?.includes('application/json')) {
+    return res.json({ ok: true })
+  }
   res.redirect(`/screenshots/${encodeURIComponent(scenario)}`)
 })
 

@@ -1052,15 +1052,15 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
     const t = f.name.replace('.png','').replace(/[-]/g,':').replace(':','-',1);
     const sizeStr = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB';
     return `
-      <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative">
-        <div style="cursor:zoom-in;background:#030712;display:flex;align-items:center;justify-content:center" onclick="openZoomModal('/screenshots/${encodeURIComponent(scenario)}/${f.name}')">
-          <img src="/screenshots/${encodeURIComponent(scenario)}/${f.name}" loading="lazy" style="width:100%;aspect-ratio:411/731;object-fit:cover;display:block">
+      <div id="cap-card-${encodeURIComponent(f.name)}" style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:all 0.3s">
+        <div style="cursor:zoom-in;background:#030712;display:flex;align-items:center;justify-content:center" onclick="openZoomModal('/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(f.name)}')">
+          <img src="/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(f.name)}" loading="lazy" style="width:100%;aspect-ratio:411/731;object-fit:cover;display:block">
         </div>
         <div style="padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted)">
-          <span>\${t}</span>
-          <span>\${sizeStr}</span>
+          <span>${t}</span>
+          <span>${sizeStr}</span>
         </div>
-        <a href="/screenshots/${encodeURIComponent(scenario)}/delete-file?file=\${f.name}" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:11px" onclick="return confirm('Hapus screenshot ini?')">✕</a>
+        <button onclick="deleteSingleCapture('${encodeURIComponent(scenario)}', '${encodeURIComponent(f.name)}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.65);border:none;color:#fff;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='#ef4444'" onmouseout="this.style.background='rgba(0,0,0,0.65)'" title="Hapus screenshot">✕</button>
       </div>
     `;
   }).join('');
@@ -1281,6 +1281,25 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
     function stopAutomation() {
       finishRun();
       document.getElementById('runStatusText').textContent = '⏹ Dibatalkan';
+    }
+
+    async function deleteSingleCapture(scenario, file) {
+      if (!confirm('Hapus screenshot ini?')) return;
+      try {
+        const r = await fetch('/screenshots/' + scenario + '/delete-file?file=' + file, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const card = document.getElementById('cap-card-' + file);
+        if (card) {
+          card.style.opacity = '0';
+          card.style.transform = 'scale(0.85)';
+          setTimeout(() => card.remove(), 250);
+        } else {
+          location.reload();
+        }
+      } catch (e) {
+        location.reload();
+      }
     }
   </script>
   `;
