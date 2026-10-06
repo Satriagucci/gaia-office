@@ -485,7 +485,18 @@ app.get('/api/apks/build', (req, res) => {
 
   // Register client to listener set
   currentBuild.clients.add(res)
+
+  // Keep-alive heartbeat every 10 seconds to prevent proxy/browser timeout during compile
+  const keepAliveTimer = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n')
+    } catch {
+      clearInterval(keepAliveTimer)
+    }
+  }, 10000)
+
   req.on('close', () => {
+    clearInterval(keepAliveTimer)
     currentBuild.clients.delete(res)
   })
 

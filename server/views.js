@@ -1452,14 +1452,30 @@ export function renderApksView() {
         } catch {}
       };
 
-      sseSource.onerror = function() {
-        if (badge.textContent !== '#SUCCESS') {
-          setPipelineProgress(100, '✕ Koneksi runner terputus', 'failed');
-          badge.className = 'jenkins-badge red';
-          badge.textContent = '#FAILED';
-          weather.textContent = '🌧️';
-          finishBuild();
-        }
+      sseSource.onerror = async function() {
+        // EventSource will automatically retry connecting. Check server status to stay updated.
+        try {
+          const res = await fetch('/api/apks/build/status');
+          const st = await res.json();
+          if (st.active) {
+            setPipelineProgress(st.progressPct || 50, '⚠️ Menghubungkan ulang telemetry runner (Kompilasi sedang berjalan)...');
+            return;
+          } else if (st.status === 'success') {
+            setPipelineProgress(100, '✓ Pipeline Selesai! APK siap dipakai.', 'success');
+            badge.className = 'jenkins-badge green';
+            badge.textContent = '#SUCCESS';
+            weather.textContent = '☀️';
+            finishBuild();
+            return;
+          } else if (st.status === 'failed') {
+            setPipelineProgress(100, st.statusText || '✕ Pipeline Gagal', 'failed');
+            badge.className = 'jenkins-badge red';
+            badge.textContent = '#FAILED';
+            weather.textContent = '🌧️';
+            finishBuild();
+            return;
+          }
+        } catch {}
       };
     }
 
