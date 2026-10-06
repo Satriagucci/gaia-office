@@ -41,6 +41,63 @@ app.use(express.static(join(__dirname, '..', 'public')))
 let activeRunner = null // { ws, id, device, model, lastSeen }
 const activeJobs = new Map() // jobId -> handlers
 
+// ── PERSISTENT BUILD PIPELINE STATE ──
+const currentBuild = {
+  active: false,
+  jobId: null,
+  profile: 'staging',
+  target: 'laptop',
+  startTime: null,
+  endTime: null,
+  status: 'idle', // 'idle' | 'running' | 'success' | 'failed'
+  stage: 'init',
+  progressPct: 0,
+  statusText: '',
+  logs: [],
+  clients: new Set(),
+}
+
+function updateBuildTelemetry(text) {
+  const lower = text.toLowerCase()
+  if (lower.includes('project directory') || lower.includes('memulai local build')) {
+    currentBuild.stage = 'config'
+    currentBuild.progressPct = Math.max(currentBuild.progressPct, 20)
+    currentBuild.statusText = 'Stage 2/5: Konfigurasi project & dependensi...'
+  } else if (
+    lower.includes('eas build') ||
+    lower.includes('expo run') ||
+    lower.includes('gradle') ||
+    lower.includes('assemblerelease') ||
+    lower.includes('compile') ||
+    lower.includes('task :') ||
+    lower.includes('daemon')
+  ) {
+    currentBuild.stage = 'compile'
+    currentBuild.progressPct = Math.max(currentBuild.progressPct, 45)
+    currentBuild.statusText = 'Stage 3/5: Mengompilasi APK secara lokal (Gradle & Kotlin)...'
+    if (lower.includes('compilereleasejava') || lower.includes('packagerelease') || lower.includes('assemblerelease')) {
+      currentBuild.progressPct = Math.max(currentBuild.progressPct, 75)
+    }
+  } else if (lower.includes('build_transfer') || lower.includes('scp') || lower.includes('transfer')) {
+    currentBuild.stage = 'transfer'
+    currentBuild.progressPct = Math.max(currentBuild.progressPct, 85)
+    currentBuild.statusText = 'Stage 4/5: Mentransfer APK ke VPS (deploy@76.13.21.10)...'
+  } else if (text.includes('BUILD_DONE') || lower.includes('selesai') || text.includes('PIPELINE_COMPLETE')) {
+    currentBuild.stage = 'deploy'
+    currentBuild.progressPct = 100
+    currentBuild.statusText = '✓ Pipeline Selesai! APK siap dipakai.'
+    currentBuild.status = 'success'
+    currentBuild.active = false
+    currentBuild.endTime = Date.now()
+  } else if (text.includes('BUILD_ERROR') || lower.includes('gagal')) {
+    currentBuild.statusText = '✕ Pipeline Gagal: ' + text.replace(/.*BUILD_ERROR\|/, '')
+    currentBuild.status = 'failed'
+    currentBuild.active = false
+    currentBuild.endTime = Date.now()
+  }
+}
+
+
 function parseMdSteps(content) {
   if (!content) return []
   const stepsMatch = content.match(/## Steps\n([\s\S]*?)(?:\n## |$)/)
@@ -422,8 +479,46 @@ app.get('/api/apks/build', (req, res) => {
     'Access-Control-Allow-Origin': '*',
   })
 
-  const send = (type, message) => {
-    res.write(`data: ${JSON.stringify({ type, message, ts: new Date().toISOString().slice(0,19) })}\n\n`)
+  const send = (type, message, extra = {}) => {
+    res.write(`data: ${JSON.stringify({ type, message, ts: new Date().toISOString().slice(0, 19), ...extra })}\n\n`)
+  }
+
+  // Register client to listener set
+  currentBuild.clients.add(res)
+  req.on('close', () => {
+    currentBuild.clients.delete(res)
+  })
+
+  // If a build is ALREADY ACTIVE, send sync state and do not spawn duplicate!
+  if (currentBuild.active) {
+    send('sync', 'Menghubungkan kembali ke build pipeline yang sedang aktif...', {
+      jobId: currentBuild.jobId,
+      profile: currentBuild.profile,
+      active: true,
+      status: currentBuild.status,
+      stage: currentBuild.stage,
+      progressPct: currentBuild.progressPct,
+      statusText: currentBuild.statusText,
+      startTime: currentBuild.startTime,
+      logs: currentBuild.logs.slice(-200)
+    })
+    return
+  }
+
+  // If a recent build finished in the last 2 minutes, send sync status
+  if (currentBuild.endTime && (Date.now() - currentBuild.endTime < 120000)) {
+    send('sync', currentBuild.statusText, {
+      jobId: currentBuild.jobId,
+      profile: currentBuild.profile,
+      active: false,
+      status: currentBuild.status,
+      stage: currentBuild.stage,
+      progressPct: currentBuild.progressPct,
+      statusText: currentBuild.statusText,
+      startTime: currentBuild.startTime,
+      logs: currentBuild.logs.slice(-200)
+    })
+    return res.end()
   }
 
   if (target === 'laptop') {
@@ -433,27 +528,96 @@ app.get('/api/apks/build', (req, res) => {
     }
 
     const jobId = `build-${Date.now()}`
-    send('info', `Mengirim perintah build (${profile}) ke Laptop Runner [${activeRunner.device}]...`)
+    currentBuild.active = true
+    currentBuild.jobId = jobId
+    currentBuild.profile = profile
+    currentBuild.target = 'laptop'
+    currentBuild.startTime = Date.now()
+    currentBuild.endTime = null
+    currentBuild.status = 'running'
+    currentBuild.stage = 'init'
+    currentBuild.progressPct = 10
+    currentBuild.statusText = `Mengirim perintah build (${profile}) ke Laptop Runner [${activeRunner.device}]...`
+    currentBuild.logs = [currentBuild.statusText]
+
+    send('info', currentBuild.statusText, {
+      stage: currentBuild.stage,
+      progressPct: currentBuild.progressPct,
+      statusText: currentBuild.statusText,
+      startTime: currentBuild.startTime
+    })
 
     activeJobs.set(jobId, {
       onLog: (text) => {
-        if (text.includes('BUILD_ERROR')) send('error', text.replace(/.*BUILD_ERROR\|/, ''))
-        else if (text.includes('BUILD_DONE') || text.includes('PIPELINE_COMPLETE')) send('done', text.replace(/.*BUILD_DONE\|/, ''))
-        else send('log', text)
+        currentBuild.logs.push(text)
+        if (currentBuild.logs.length > 500) currentBuild.logs.shift()
+        updateBuildTelemetry(text)
+
+        const type = text.includes('BUILD_ERROR') ? 'error' : (text.includes('BUILD_DONE') ? 'done' : 'log')
+        const cleanMsg = text.includes('BUILD_ERROR') ? text.replace(/.*BUILD_ERROR\|/, '') : (text.includes('BUILD_DONE') ? text.replace(/.*BUILD_DONE\|/, '') : text)
+        
+        const payload = `data: ${JSON.stringify({
+          type,
+          message: cleanMsg,
+          stage: currentBuild.stage,
+          progressPct: currentBuild.progressPct,
+          statusText: currentBuild.statusText,
+          ts: new Date().toISOString().slice(0, 19)
+        })}\n\n`
+
+        for (const client of currentBuild.clients) {
+          try { client.write(payload) } catch {}
+        }
       },
       onDone: (data) => {
-        send('done', data.message || 'Build dan SCP transfer selesai! APK tersedia di VPS.')
+        currentBuild.active = false
+        currentBuild.status = 'success'
+        currentBuild.stage = 'deploy'
+        currentBuild.progressPct = 100
+        currentBuild.statusText = '✓ Build dan SCP transfer selesai! APK tersedia di VPS.'
+        currentBuild.endTime = Date.now()
+
+        const payload = `data: ${JSON.stringify({
+          type: 'done',
+          message: data.message || currentBuild.statusText,
+          stage: 'deploy',
+          progressPct: 100,
+          statusText: currentBuild.statusText,
+          ts: new Date().toISOString().slice(0, 19)
+        })}\n\n`
+
+        for (const client of currentBuild.clients) {
+          try {
+            client.write(payload)
+            client.end()
+          } catch {}
+        }
         activeJobs.delete(jobId)
-        res.end()
       },
       onError: (err) => {
-        send('error', err.message || 'Build gagal')
+        currentBuild.active = false
+        currentBuild.status = 'failed'
+        currentBuild.progressPct = 100
+        currentBuild.statusText = '✕ Build gagal: ' + (err.message || 'Error tidak diketahui')
+        currentBuild.endTime = Date.now()
+
+        const payload = `data: ${JSON.stringify({
+          type: 'error',
+          message: err.message || 'Build gagal',
+          progressPct: 100,
+          statusText: currentBuild.statusText,
+          ts: new Date().toISOString().slice(0, 19)
+        })}\n\n`
+
+        for (const client of currentBuild.clients) {
+          try {
+            client.write(payload)
+            client.end()
+          } catch {}
+        }
         activeJobs.delete(jobId)
-        res.end()
       }
     })
-
-    req.on('close', () => activeJobs.delete(jobId))
 
     activeRunner.ws.send(JSON.stringify({
       type: 'cmd_build',
@@ -465,6 +629,22 @@ app.get('/api/apks/build', (req, res) => {
 
   send('warn', 'Build via VPS tidak memiliki Docker Android. Gunakan target laptop runner.')
   res.end()
+})
+
+// API: Check build status for reconnecting UI
+app.get('/api/apks/build/status', (_req, res) => {
+  res.json({
+    active: currentBuild.active,
+    jobId: currentBuild.jobId,
+    profile: currentBuild.profile,
+    status: currentBuild.status,
+    stage: currentBuild.stage,
+    progressPct: currentBuild.progressPct,
+    statusText: currentBuild.statusText,
+    startTime: currentBuild.startTime,
+    endTime: currentBuild.endTime,
+    logCount: currentBuild.logs.length
+  })
 })
 
 // API: Install APK to emulator

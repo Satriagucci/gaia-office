@@ -1313,7 +1313,7 @@ export function renderApksView() {
       if (sText) sText.textContent = statusText;
     }
 
-    function startApkBuild(profile) {
+    function startApkBuild(profile, isResume = false) {
       const con = document.getElementById('buildConsole');
       const bStaging = document.getElementById('btnBuildStaging');
       const bProd = document.getElementById('btnBuildProd');
@@ -1321,23 +1321,24 @@ export function renderApksView() {
       const weather = document.getElementById('jenkinsWeather');
       const timerEl = document.getElementById('jenkinsTimer');
 
-      con.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan trigger build (' + profile + ')...</div>';
       bStaging.disabled = true;
       bProd.disabled = true;
 
-      // Reset stages
-      ['stage-init', 'stage-config', 'stage-compile', 'stage-transfer', 'stage-deploy'].forEach(id => {
-        setStageState(id, 'pending', '-');
-      });
-      setStageState('stage-init', 'running', '...');
-      setPipelineProgress(10, 'Stage 1/5: Menginisialisasi runner environment...');
+      if (!isResume) {
+        con.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan trigger build (' + profile + ')...</div>';
+        ['stage-init', 'stage-config', 'stage-compile', 'stage-transfer', 'stage-deploy'].forEach(id => {
+          setStageState(id, 'pending', '-');
+        });
+        setStageState('stage-init', 'running', '...');
+        setPipelineProgress(10, 'Stage 1/5: Menginisialisasi runner environment...');
+        buildStartTime = Date.now();
+      }
 
       badge.className = 'jenkins-badge blue';
       badge.textContent = '#BUILD-' + profile.toUpperCase();
       weather.textContent = '⛅';
 
       // Start stopwatch timer
-      buildStartTime = Date.now();
       if (buildTimerInterval) clearInterval(buildTimerInterval);
       buildTimerInterval = setInterval(() => {
         const sec = Math.floor((Date.now() - buildStartTime) / 1000);
@@ -1350,9 +1351,49 @@ export function renderApksView() {
       sseSource.onmessage = function(e) {
         try {
           const d = JSON.parse(e.data);
-          const line = document.createElement('div');
           const msg = d.message || d.type || '';
+          const lower = msg.toLowerCase();
 
+          // Sync initial state if reconnecting after navigation
+          if (d.type === 'sync') {
+            if (d.startTime) buildStartTime = d.startTime;
+            if (d.logs && Array.isArray(d.logs)) {
+              con.innerHTML = '';
+              d.logs.forEach(l => {
+                const line = document.createElement('div');
+                line.className = l.includes('BUILD_ERROR') ? 'log-err' : (l.includes('BUILD_DONE') ? 'log-ok' : 'log-dim');
+                line.textContent = l;
+                con.appendChild(line);
+              });
+              con.scrollTop = con.scrollHeight;
+            }
+            if (d.stage) {
+              const stages = ['init', 'config', 'compile', 'transfer', 'deploy'];
+              const curIdx = stages.indexOf(d.stage);
+              stages.forEach((st, idx) => {
+                if (idx < curIdx) setStageState('stage-' + st, 'success', '✓');
+                else if (idx === curIdx) setStageState('stage-' + st, 'running', '...');
+                else setStageState('stage-' + st, 'pending', '-');
+              });
+            }
+            if (d.progressPct) {
+              setPipelineProgress(d.progressPct, d.statusText || 'Pipeline sedang berjalan...', d.status === 'success' ? 'success' : d.status === 'failed' ? 'failed' : 'running');
+            }
+            if (d.status === 'success') {
+              badge.className = 'jenkins-badge green';
+              badge.textContent = '#SUCCESS';
+              weather.textContent = '☀️';
+              finishBuild();
+            } else if (d.status === 'failed') {
+              badge.className = 'jenkins-badge red';
+              badge.textContent = '#FAILED';
+              weather.textContent = '🌧️';
+              finishBuild();
+            }
+            return;
+          }
+
+          const line = document.createElement('div');
           if (d.type === 'error' || msg.includes('BUILD_ERROR')) line.className = 'log-err';
           else if (d.type === 'done' || msg.includes('BUILD_DONE')) line.className = 'log-ok';
           else line.className = 'log-dim';
@@ -1363,23 +1404,36 @@ export function renderApksView() {
             con.scrollTop = con.scrollHeight;
           }
 
-          // Stage detection logic based on log stream
-          if (msg.includes('Project directory') || msg.includes('profile')) {
+          // Case-insensitive Stage detection
+          if (lower.includes('project directory') || lower.includes('memulai local build')) {
             setStageState('stage-init', 'success', '2s');
             setStageState('stage-config', 'running', '...');
             setPipelineProgress(25, 'Stage 2/5: Konfigurasi project & dependensi...');
           }
-          else if (msg.includes('eas build') || msg.includes('expo run') || msg.includes('gradle') || msg.includes('prebuild')) {
+          else if (
+            lower.includes('eas build') ||
+            lower.includes('expo run') ||
+            lower.includes('gradle') ||
+            lower.includes('assemblerelease') ||
+            lower.includes('compile') ||
+            lower.includes('task :') ||
+            lower.includes('daemon')
+          ) {
+            setStageState('stage-init', 'success', '2s');
             setStageState('stage-config', 'success', '4s');
             setStageState('stage-compile', 'running', '...');
-            setPipelineProgress(45, 'Stage 3/5: Mengompilasi APK secara lokal (Docker / Gradle)...');
+            let pct = 50;
+            if (lower.includes('compilerelease') || lower.includes('packagerelease')) pct = 75;
+            setPipelineProgress(pct, 'Stage 3/5: Mengompilasi APK secara lokal (Gradle & Kotlin)...');
           }
-          else if (msg.includes('BUILD_TRANSFER') || msg.includes('SCP')) {
+          else if (lower.includes('build_transfer') || lower.includes('scp') || lower.includes('transfer')) {
+            setStageState('stage-init', 'success', '2s');
+            setStageState('stage-config', 'success', '4s');
             setStageState('stage-compile', 'success', 'ok');
             setStageState('stage-transfer', 'running', '...');
-            setPipelineProgress(80, 'Stage 4/5: Mentransfer APK ke VPS (deploy@76.13.21.10)...');
+            setPipelineProgress(85, 'Stage 4/5: Mentransfer APK ke VPS (deploy@76.13.21.10)...');
           }
-          else if (d.type === 'done' || msg.includes('BUILD_DONE') || msg.includes('selesai')) {
+          else if (d.type === 'done' || msg.includes('BUILD_DONE') || lower.includes('selesai')) {
             setStageState('stage-transfer', 'success', 'ok');
             setStageState('stage-deploy', 'success', 'ok');
             setPipelineProgress(100, '✓ Pipeline Selesai! APK siap dipakai.', 'success');
@@ -1399,11 +1453,13 @@ export function renderApksView() {
       };
 
       sseSource.onerror = function() {
-        setPipelineProgress(100, '✕ Koneksi runner terputus', 'failed');
-        badge.className = 'jenkins-badge red';
-        badge.textContent = '#FAILED';
-        weather.textContent = '🌧️';
-        finishBuild();
+        if (badge.textContent !== '#SUCCESS') {
+          setPipelineProgress(100, '✕ Koneksi runner terputus', 'failed');
+          badge.className = 'jenkins-badge red';
+          badge.textContent = '#FAILED';
+          weather.textContent = '🌧️';
+          finishBuild();
+        }
       };
     }
 
@@ -1421,7 +1477,19 @@ export function renderApksView() {
       loadApksList();
     }
 
+    async function checkActiveBuild() {
+      try {
+        const res = await fetch('/api/apks/build/status');
+        const st = await res.json();
+        if (st.active) {
+          buildStartTime = st.startTime || Date.now();
+          startApkBuild(st.profile || 'staging', true);
+        }
+      } catch {}
+    }
+
     loadApksList();
+    checkActiveBuild();
   </script>
   `;
 

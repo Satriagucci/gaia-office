@@ -8,6 +8,6 @@ done
 rm -f /tmp/gaia-server.log /tmp/gaia.log
 sleep 1
 cd /home/hermes/gaia-vault/gaia-office
-su hermes -c "nohup node server/index.js > /home/hermes/gaia-server.log 2>&1 &"
+nohup node server/index.js > /home/hermes/gaia-server.log 2>&1 &
 sleep 2
 curl -s http://localhost:8788/api/runner/status
