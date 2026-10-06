@@ -743,6 +743,38 @@ app.get('/api/apks/build', (req, res) => {
         currentBuild.statusText = '✓ Build dan SCP transfer selesai! APK tersedia di VPS.'
         currentBuild.endTime = Date.now()
 
+        const durationSec = Math.round((currentBuild.endTime - (currentBuild.startTime || currentBuild.endTime)) / 1000)
+        let latestApk = null
+        try {
+          const apks = readdirSync(APK_DIR)
+            .filter(f => f.endsWith('.apk'))
+            .map(f => ({ file: f, size: statSync(join(APK_DIR, f)).size, time: statSync(join(APK_DIR, f)).mtimeMs }))
+            .sort((a, b) => b.time - a.time)
+          if (apks.length > 0) latestApk = apks[0]
+        } catch {}
+
+        saveBuildRecord({
+          id: currentBuild.id || 1,
+          jobId: currentBuild.jobId,
+          profile: currentBuild.profile,
+          target: currentBuild.target,
+          node: currentBuild.node,
+          status: 'SUCCESS',
+          weather: '☀️',
+          startTime: currentBuild.startTime,
+          endTime: currentBuild.endTime,
+          durationSec,
+          stageTimes: currentBuild.stageTimes,
+          apkFile: latestApk?.file || null,
+          apkSize: latestApk?.size || null,
+          errorReason: null,
+          logs: currentBuild.logs.slice(-200)
+        })
+
+        try {
+          writeFileSync(join(BUILD_LOGS_DIR, `${currentBuild.jobId}.log`), currentBuild.logs.join('\n'), 'utf-8')
+        } catch {}
+
         const payload = `data: ${JSON.stringify({
           type: 'done',
           message: data.message || currentBuild.statusText,
@@ -766,6 +798,29 @@ app.get('/api/apks/build', (req, res) => {
         currentBuild.progressPct = 100
         currentBuild.statusText = '✕ Build gagal: ' + (err.message || 'Error tidak diketahui')
         currentBuild.endTime = Date.now()
+
+        const durationSec = Math.round((currentBuild.endTime - (currentBuild.startTime || currentBuild.endTime)) / 1000)
+        saveBuildRecord({
+          id: currentBuild.id || 1,
+          jobId: currentBuild.jobId,
+          profile: currentBuild.profile,
+          target: currentBuild.target,
+          node: currentBuild.node,
+          status: 'FAILED',
+          weather: '🌧️',
+          startTime: currentBuild.startTime,
+          endTime: currentBuild.endTime,
+          durationSec,
+          stageTimes: currentBuild.stageTimes,
+          apkFile: null,
+          apkSize: null,
+          errorReason: err.message || currentBuild.statusText,
+          logs: currentBuild.logs.slice(-200)
+        })
+
+        try {
+          writeFileSync(join(BUILD_LOGS_DIR, `${currentBuild.jobId}.log`), currentBuild.logs.join('\n'), 'utf-8')
+        } catch {}
 
         const payload = `data: ${JSON.stringify({
           type: 'error',
@@ -936,7 +991,11 @@ wss.on('connection', (ws) => {
       // ── RUNNER BUILD / CAPTURE DONE ──
       if (msg.type === 'runner_done') {
         const job = activeJobs.get(msg.jobId)
-        if (job?.onDone) job.onDone(msg)
+        if (msg.status === 'error') {
+          if (job?.onError) job.onError(new Error(msg.message || 'Build gagal'))
+        } else {
+          if (job?.onDone) job.onDone(msg)
+        }
         return
       }
 
