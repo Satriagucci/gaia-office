@@ -1,0 +1,65 @@
+[
+  {
+    "id": 2,
+    "jobId": "build-1791311987183",
+    "profile": "staging",
+    "target": "laptop",
+    "node": "Laptop-Satria (Local Gradle Pipeline)",
+    "status": "FAILED",
+    "weather": "🌧️",
+    "startTime": 1791311987183,
+    "endTime": 1791312398183,
+    "durationSec": 411,
+    "stageTimes": {
+      "init": "2s",
+      "config": "4s",
+      "compile": "failed (6m 45s)",
+      "transfer": "-",
+      "deploy": "-"
+    },
+    "apkFile": null,
+    "apkSize": null,
+    "errorReason": "ninja: error: manifest 'build.ninja' still dirty after 100 tries — Kompilasi gagal (exit 1)",
+    "logs": [
+      "[01:41:27] Memulai Build APK (staging) untuk Job build-1791311987183...",
+      "[01:41:27] BUILD_LOG|Project directory: c:\\Users\\SatriaGucci\\Development\\bukainjalan_app\\bukainjalan_mobile",
+      "[01:41:27] BUILD_LOG|Memulai local build dengan profile: staging",
+      "[01:41:27] BUILD_LOG|Jalankan: eas build --local --profile staging --platform android --output D:\\bukainjalan-apks",
+      "[01:41:31] BUILD_WARN|EAS local butuh platform Linux/Docker, beralih ke Native Expo Gradle Pipeline...",
+      "[01:41:31] BUILD_LOG|Kompilasi APK via Gradle assembleRelease...",
+      "[01:48:22] BUILD_RAW|ninja: error: manifest 'build.ninja' still dirty after 100 tries",
+      "[01:48:22] BUILD_RAW|BUILD FAILED in 6m 51s",
+      "[01:48:23] BUILD_ERROR|Kompilasi gagal (exit 1)."
+    ]
+  },
+  {
+    "id": 1,
+    "jobId": "build-20261006-001",
+    "profile": "staging",
+    "target": "laptop",
+    "node": "Laptop-Satria (Local Gradle Pipeline)",
+    "status": "SUCCESS",
+    "weather": "☀️",
+    "startTime": 1791306800000,
+    "endTime": 1791307048000,
+    "durationSec": 248,
+    "stageTimes": {
+      "init": "2s",
+      "config": "4s",
+      "compile": "3m 48s",
+      "transfer": "11s",
+      "deploy": "3s"
+    },
+    "apkFile": "bukainjalan-staging-preview.apk",
+    "apkSize": 49234496,
+    "errorReason": null,
+    "logs": [
+      "[00:10:00] Initialized Laptop Runner Environment",
+      "[00:10:02] Loading app.config.js and Expo config",
+      "[00:10:06] Executing Gradle assembleRelease on Android...",
+      "[00:13:54] Compiling Hermes and Native modules: SUCCESS",
+      "[00:14:05] BUILD_TRANSFER|Mentransfer APK ke VPS (deploy@76.13.21.10)...",
+      "[00:14:16] BUILD_DONE|Kompilasi dan transfer selesai! APK siap diuji."
+    ]
+  }
+]
