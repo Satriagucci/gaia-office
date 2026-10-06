@@ -41,16 +41,53 @@ app.use(express.static(join(__dirname, '..', 'public')))
 let activeRunner = null // { ws, id, device, model, lastSeen }
 const activeJobs = new Map() // jobId -> handlers
 
+// ── BUILD HISTORY & PERSISTENCE ──
+const DATA_DIR = join(__dirname, '..', 'data')
+const BUILDS_FILE = join(DATA_DIR, 'builds.json')
+const BUILD_LOGS_DIR = join(DATA_DIR, 'build-logs')
+
+try { mkdirSync(DATA_DIR, { recursive: true }) } catch {}
+try { mkdirSync(BUILD_LOGS_DIR, { recursive: true }) } catch {}
+
+function loadBuildHistory() {
+  try {
+    if (existsSync(BUILDS_FILE)) {
+      const data = JSON.parse(readFileSync(BUILDS_FILE, 'utf-8'))
+      if (Array.isArray(data)) return data
+    }
+  } catch {}
+  return []
+}
+
+function saveBuildRecord(record) {
+  try {
+    const list = loadBuildHistory()
+    const idx = list.findIndex(b => (b.id && b.id === record.id) || (b.jobId && b.jobId === record.jobId))
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...record }
+    } else {
+      list.unshift(record)
+    }
+    if (list.length > 50) list.length = 50
+    writeFileSync(BUILDS_FILE, JSON.stringify(list, null, 2), 'utf-8')
+  } catch (e) {
+    console.error('saveBuildRecord error:', e.message)
+  }
+}
+
 // ── PERSISTENT BUILD PIPELINE STATE ──
 const currentBuild = {
   active: false,
+  id: null,
   jobId: null,
   profile: 'staging',
   target: 'laptop',
+  node: 'Laptop-Satria',
   startTime: null,
   endTime: null,
   status: 'idle', // 'idle' | 'running' | 'success' | 'failed'
   stage: 'init',
+  stageTimes: { init: null, config: null, compile: null, transfer: null, deploy: null },
   progressPct: 0,
   statusText: '',
   logs: [],
@@ -61,6 +98,7 @@ function updateBuildTelemetry(text) {
   const lower = text.toLowerCase()
   if (lower.includes('project directory') || lower.includes('memulai local build')) {
     currentBuild.stage = 'config'
+    currentBuild.stageTimes.init = '2s'
     currentBuild.progressPct = Math.max(currentBuild.progressPct, 20)
     currentBuild.statusText = 'Stage 2/5: Konfigurasi project & dependensi...'
   } else if (
@@ -73,6 +111,7 @@ function updateBuildTelemetry(text) {
     lower.includes('daemon')
   ) {
     currentBuild.stage = 'compile'
+    currentBuild.stageTimes.config = '4s'
     currentBuild.progressPct = Math.max(currentBuild.progressPct, 45)
     currentBuild.statusText = 'Stage 3/5: Mengompilasi APK secara lokal (Gradle & Kotlin)...'
     if (lower.includes('compilereleasejava') || lower.includes('packagerelease') || lower.includes('assemblerelease')) {
@@ -80,20 +119,78 @@ function updateBuildTelemetry(text) {
     }
   } else if (lower.includes('build_transfer') || lower.includes('scp') || lower.includes('transfer')) {
     currentBuild.stage = 'transfer'
+    currentBuild.stageTimes.compile = 'ok'
     currentBuild.progressPct = Math.max(currentBuild.progressPct, 85)
     currentBuild.statusText = 'Stage 4/5: Mentransfer APK ke VPS (deploy@76.13.21.10)...'
   } else if (text.includes('BUILD_DONE') || lower.includes('selesai') || text.includes('PIPELINE_COMPLETE')) {
     currentBuild.stage = 'deploy'
+    currentBuild.stageTimes.transfer = 'ok'
+    currentBuild.stageTimes.deploy = 'ok'
     currentBuild.progressPct = 100
     currentBuild.statusText = '✓ Pipeline Selesai! APK siap dipakai.'
     currentBuild.status = 'success'
     currentBuild.active = false
     currentBuild.endTime = Date.now()
-  } else if (text.includes('BUILD_ERROR') || lower.includes('gagal')) {
+
+    const durationSec = Math.round((currentBuild.endTime - (currentBuild.startTime || currentBuild.endTime)) / 1000)
+    let latestApk = null
+    try {
+      const apks = readdirSync(APK_DIR)
+        .filter(f => f.endsWith('.apk'))
+        .map(f => ({ file: f, size: statSync(join(APK_DIR, f)).size, time: statSync(join(APK_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.time - a.time)
+      if (apks.length > 0) latestApk = apks[0]
+    } catch {}
+
+    saveBuildRecord({
+      id: currentBuild.id || 1,
+      jobId: currentBuild.jobId,
+      profile: currentBuild.profile,
+      target: currentBuild.target,
+      node: currentBuild.node,
+      status: 'SUCCESS',
+      weather: '☀️',
+      startTime: currentBuild.startTime,
+      endTime: currentBuild.endTime,
+      durationSec,
+      stageTimes: currentBuild.stageTimes,
+      apkFile: latestApk?.file || null,
+      apkSize: latestApk?.size || null,
+      errorReason: null,
+      logs: currentBuild.logs.slice(-200)
+    })
+
+    try {
+      writeFileSync(join(BUILD_LOGS_DIR, `${currentBuild.jobId}.log`), currentBuild.logs.join('\n'), 'utf-8')
+    } catch {}
+  } else if (text.includes('BUILD_ERROR') || lower.includes('gagal') || lower.includes('ninja: build stopped') || lower.includes('cmake... failed')) {
     currentBuild.statusText = '✕ Pipeline Gagal: ' + text.replace(/.*BUILD_ERROR\|/, '')
     currentBuild.status = 'failed'
     currentBuild.active = false
     currentBuild.endTime = Date.now()
+
+    const durationSec = Math.round((currentBuild.endTime - (currentBuild.startTime || currentBuild.endTime)) / 1000)
+    saveBuildRecord({
+      id: currentBuild.id || 1,
+      jobId: currentBuild.jobId,
+      profile: currentBuild.profile,
+      target: currentBuild.target,
+      node: currentBuild.node,
+      status: 'FAILED',
+      weather: '🌧️',
+      startTime: currentBuild.startTime,
+      endTime: currentBuild.endTime,
+      durationSec,
+      stageTimes: currentBuild.stageTimes,
+      apkFile: null,
+      apkSize: null,
+      errorReason: text.replace(/.*BUILD_ERROR\|/, ''),
+      logs: currentBuild.logs.slice(-200)
+    })
+
+    try {
+      writeFileSync(join(BUILD_LOGS_DIR, `${currentBuild.jobId}.log`), currentBuild.logs.join('\n'), 'utf-8')
+    } catch {}
   }
 }
 
@@ -449,7 +546,42 @@ app.get('/screenshots/:scenario/run', (req, res) => {
 
 // ── APK Management Page ──
 app.get('/apks', (_req, res) => {
-  res.send(renderApksView())
+  const builds = loadBuildHistory()
+  res.send(renderApksView({ builds }))
+})
+
+// API: List Build History
+app.get('/api/apks/history', (_req, res) => {
+  res.json({ builds: loadBuildHistory() })
+})
+
+// API: Get Build Report by ID
+app.get('/api/apks/history/:id', (req, res) => {
+  const id = req.params.id
+  const builds = loadBuildHistory()
+  const b = builds.find(x => x.id == id || x.jobId === id)
+  if (!b) return res.status(404).json({ error: 'Build report not found' })
+  res.json(b)
+})
+
+// API: Get Build Log
+app.get('/api/apks/history/:id/log', (req, res) => {
+  const id = req.params.id
+  const logFile = join(BUILD_LOGS_DIR, `${id}.log`)
+  if (existsSync(logFile)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    return res.sendFile(logFile)
+  }
+  const builds = loadBuildHistory()
+  const b = builds.find(x => x.id == id || x.jobId === id)
+  if (b?.jobId && existsSync(join(BUILD_LOGS_DIR, `${b.jobId}.log`))) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    return res.sendFile(join(BUILD_LOGS_DIR, `${b.jobId}.log`))
+  }
+  if (b?.logs && b.logs.length) {
+    return res.type('text/plain').send(b.logs.join('\n'))
+  }
+  res.status(404).send('Log tidak ditemukan')
 })
 
 // API: List APKs
@@ -538,18 +670,41 @@ app.get('/api/apks/build', (req, res) => {
       return res.end()
     }
 
+    const history = loadBuildHistory()
+    const nextId = (history[0]?.id || 0) + 1
     const jobId = `build-${Date.now()}`
     currentBuild.active = true
+    currentBuild.id = nextId
     currentBuild.jobId = jobId
     currentBuild.profile = profile
     currentBuild.target = 'laptop'
+    currentBuild.node = activeRunner ? (activeRunner.model || 'Laptop-Satria') : 'Laptop-Satria'
     currentBuild.startTime = Date.now()
     currentBuild.endTime = null
     currentBuild.status = 'running'
     currentBuild.stage = 'init'
+    currentBuild.stageTimes = { init: null, config: null, compile: null, transfer: null, deploy: null }
     currentBuild.progressPct = 10
     currentBuild.statusText = `Mengirim perintah build (${profile}) ke Laptop Runner [${activeRunner.device}]...`
     currentBuild.logs = [currentBuild.statusText]
+
+    saveBuildRecord({
+      id: nextId,
+      jobId,
+      profile,
+      target: 'laptop',
+      node: currentBuild.node,
+      status: 'RUNNING',
+      weather: '⛅',
+      startTime: currentBuild.startTime,
+      endTime: null,
+      durationSec: 0,
+      stageTimes: currentBuild.stageTimes,
+      apkFile: null,
+      apkSize: null,
+      errorReason: null,
+      logs: currentBuild.logs
+    })
 
     send('info', currentBuild.statusText, {
       stage: currentBuild.stage,

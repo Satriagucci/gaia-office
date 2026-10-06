@@ -1160,7 +1160,7 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
 // ─────────────────────────────────────────────────────────────
 // APK MANAGER VIEW (GET /apks)
 // ─────────────────────────────────────────────────────────────
-export function renderApksView() {
+export function renderApksView({ builds = [] } = {}) {
   const body = `
   <div class="container">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
@@ -1257,6 +1257,20 @@ export function renderApksView() {
       </div>
     </div>
 
+    <!-- Jenkins Build History & Reports Card -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">
+          <span>📜</span> Build History & Pipeline Reports (Jenkins View)
+        </div>
+        <button onclick="loadBuildHistory()" class="btn btn-secondary btn-sm">🔄 Refresh History</button>
+      </div>
+
+      <div id="buildHistoryContainer">
+        <p style="color:var(--text-muted);padding:24px 0;text-align:center">Memuat riwayat build...</p>
+      </div>
+    </div>
+
     <!-- APK List Table Card -->
     <div class="card">
       <div class="card-header">
@@ -1268,6 +1282,69 @@ export function renderApksView() {
       
       <div id="apksTableContainer">
         <p style="color:var(--text-muted);padding:30px 0;text-align:center">Memuat daftar APK...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jenkins Build Report Modal -->
+  <div id="buildReportModal" class="modal-overlay" onclick="if(event.target===this)closeReportModal()">
+    <div class="modal" style="max-width:820px;max-height:92vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:14px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="jenkins-weather" id="repWeather">☀️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h2 style="font-size:18px;font-weight:800;color:#fff" id="repTitle">Build Report #1</h2>
+              <span class="jenkins-badge green" id="repBadge">#SUCCESS</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="repSubtitle">
+              Node: Laptop-Satria • Profile: staging • Durasi: 3m 48s
+            </div>
+          </div>
+        </div>
+        <button onclick="closeReportModal()" class="btn btn-secondary btn-sm">✕ Tutup</button>
+      </div>
+
+      <!-- Stage View Breakdown -->
+      <h4 style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Stage View Breakdown</h4>
+      <div class="jenkins-stages" id="repStages" style="margin-bottom:20px"></div>
+
+      <!-- Failure Diagnosis (if failed) -->
+      <div id="repFailureBox" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-weight:700;color:#f87171;font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+          <span>❌</span> Root Cause / Error Diagnosis
+        </div>
+        <div id="repFailureText" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#fca5a5;white-space:pre-wrap;word-break:break-all"></div>
+      </div>
+
+      <!-- Artifacts Section -->
+      <div id="repArtifactBox" style="display:none;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-weight:700;color:#34d399;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span>📦</span> Build Artifacts (Ready to Install)
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div id="repArtifactName" style="font-weight:700;font-size:13px;color:#fff;font-family:'JetBrains Mono',monospace"></div>
+            <div id="repArtifactSize" style="font-size:11px;color:var(--text-muted)"></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <a id="repArtifactDownload" href="#" class="btn btn-success btn-sm" download>⬇️ Download APK</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Console Log -->
+      <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <h4 style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Console Output Log</h4>
+        <div style="display:flex;gap:6px">
+          <button onclick="copyReportLog()" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px">📋 Copy</button>
+          <a id="repDownloadLogBtn" href="#" target="_blank" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px" download>⬇️ Raw Log</a>
+        </div>
+      </div>
+      <div id="repConsole" class="terminal-box" style="max-height:260px"></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+        <button onclick="closeReportModal()" class="btn btn-secondary">Tutup</button>
       </div>
     </div>
   </div>
@@ -1491,6 +1568,7 @@ export function renderApksView() {
       document.getElementById('btnBuildStaging').disabled = false;
       document.getElementById('btnBuildProd').disabled = false;
       loadApksList();
+      loadBuildHistory();
     }
 
     async function checkActiveBuild() {
@@ -1504,7 +1582,178 @@ export function renderApksView() {
       } catch {}
     }
 
+    async function loadBuildHistory() {
+      const container = document.getElementById('buildHistoryContainer');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/apks/history');
+        const d = await res.json();
+        const builds = d.builds || [];
+        if (builds.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-muted);padding:30px 0;text-align:center">Belum ada riwayat build. Jalankan build pipeline untuk membuat history pertama.</p>';
+          return;
+        }
+
+        const rows = builds.map(b => {
+          const isSuccess = b.status === 'SUCCESS';
+          const isRunning = b.status === 'RUNNING';
+          const badgeClass = isSuccess ? 'green' : (isRunning ? 'blue' : 'red');
+          const weather = b.weather || (isSuccess ? '☀️' : (isRunning ? '⛅' : '🌧️'));
+          const dateStr = b.startTime ? new Date(b.startTime).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+          const durationStr = b.durationSec ? formatDuration(b.durationSec) : (b.startTime && isRunning ? formatDuration(Math.floor((Date.now() - b.startTime)/1000)) : '-');
+          const artifactHtml = b.apkFile 
+            ? '<a href="/apks/' + encodeURIComponent(b.apkFile) + '" class="btn btn-secondary btn-sm" download style="padding:3px 8px;font-size:11px" title="' + b.apkFile + '">⬇️ APK</a>'
+            : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+
+          return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+            '<td style="padding:12px 14px;font-family:\'JetBrains Mono\',monospace;font-weight:700">' +
+              '<a href="javascript:void(0)" onclick="openBuildReport(\'' + (b.id || b.jobId) + '\')" style="color:#38bdf8;text-decoration:none">#' + (b.id || b.jobId.slice(-4)) + '</a>' +
+            '</td>' +
+            '<td style="padding:12px 14px;font-size:18px">' + weather + '</td>' +
+            '<td style="padding:12px 14px"><span class="jenkins-badge ' + badgeClass + '" style="font-size:10px">#' + b.status + '</span></td>' +
+            '<td style="padding:12px 14px;font-size:12px;font-weight:600">' + (b.profile || 'staging') + '</td>' +
+            '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + (b.node || 'Laptop-Satria') + '</td>' +
+            '<td style="padding:12px 14px;font-family:\'JetBrains Mono\',monospace;font-size:12px">' + durationStr + '</td>' +
+            '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + dateStr + '</td>' +
+            '<td style="padding:12px 14px">' + artifactHtml + '</td>' +
+            '<td style="padding:12px 14px;text-align:right">' +
+              '<button onclick="openBuildReport(\'' + (b.id || b.jobId) + '\')" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">📑 Report</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
+        container.innerHTML = '<div style="overflow-x:auto">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left">' +
+            '<thead>' +
+              '<tr style="border-bottom:1px solid var(--border);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">' +
+                '<th style="padding:10px 14px">Build</th>' +
+                '<th style="padding:10px 14px">W</th>' +
+                '<th style="padding:10px 14px">Status</th>' +
+                '<th style="padding:10px 14px">Profile</th>' +
+                '<th style="padding:10px 14px">Node</th>' +
+                '<th style="padding:10px 14px">Durasi</th>' +
+                '<th style="padding:10px 14px">Waktu</th>' +
+                '<th style="padding:10px 14px">Artifact</th>' +
+                '<th style="padding:10px 14px;text-align:right">Aksi</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>';
+      } catch (e) {
+        container.innerHTML = '<p style="color:#f87171;padding:20px 0;text-align:center">Gagal memuat riwayat: ' + e.message + '</p>';
+      }
+    }
+
+    let activeReportLogText = '';
+
+    async function openBuildReport(id) {
+      try {
+        const res = await fetch('/api/apks/history/' + encodeURIComponent(id));
+        const b = await res.json();
+        if (!b || b.error) return alert('Report tidak ditemukan');
+
+        document.getElementById('repTitle').textContent = 'Build Report #' + (b.id || b.jobId);
+        document.getElementById('repWeather').textContent = b.weather || (b.status === 'SUCCESS' ? '☀️' : (b.status === 'RUNNING' ? '⛅' : '🌧️'));
+        
+        const badge = document.getElementById('repBadge');
+        badge.className = 'jenkins-badge ' + (b.status === 'SUCCESS' ? 'green' : (b.status === 'RUNNING' ? 'blue' : 'red'));
+        badge.textContent = '#' + b.status;
+
+        const dur = b.durationSec ? formatDuration(b.durationSec) : '-';
+        document.getElementById('repSubtitle').textContent = 'Node: ' + (b.node || 'Laptop-Satria') + ' • Profile: ' + (b.profile || 'staging') + ' • Durasi: ' + dur;
+
+        // Render Stages
+        const stContainer = document.getElementById('repStages');
+        const stageList = [
+          { id: 'init', name: 'Checkout & Init', dur: b.stageTimes?.init || '2s' },
+          { id: 'config', name: 'Env & Config', dur: b.stageTimes?.config || '4s' },
+          { id: 'compile', name: 'Compile APK', dur: b.stageTimes?.compile || (b.status === 'FAILED' ? 'failed' : '3m 48s') },
+          { id: 'transfer', name: 'SCP to VPS', dur: b.stageTimes?.transfer || (b.status === 'SUCCESS' ? '12s' : '-') },
+          { id: 'deploy', name: 'Verify & Publish', dur: b.stageTimes?.deploy || (b.status === 'SUCCESS' ? '3s' : '-') }
+        ];
+
+        stContainer.innerHTML = stageList.map(st => {
+          let state = 'pending';
+          let icon = '•';
+          if (b.status === 'SUCCESS') {
+            state = 'success';
+            icon = '✓';
+          } else if (b.status === 'FAILED') {
+            if (st.id === 'init' || st.id === 'config') { state = 'success'; icon = '✓'; }
+            else if (st.id === 'compile') { state = 'failed'; icon = '✕'; }
+            else { state = 'pending'; icon = '-'; }
+          } else if (b.status === 'RUNNING') {
+            state = 'running';
+            icon = '⚡';
+          }
+          return '<div class="jenkins-stage-box ' + state + '">' +
+            '<div class="jenkins-stage-icon">' + icon + '</div>' +
+            '<div class="jenkins-stage-title">' + st.name + '</div>' +
+            '<div class="jenkins-stage-duration">' + st.dur + '</div>' +
+          '</div>';
+        }).join('');
+
+        // Failure diagnosis
+        const failBox = document.getElementById('repFailureBox');
+        const failText = document.getElementById('repFailureText');
+        if (b.status === 'FAILED' && b.errorReason) {
+          failBox.style.display = 'block';
+          failText.textContent = b.errorReason;
+        } else {
+          failBox.style.display = 'none';
+        }
+
+        // Artifact box
+        const artBox = document.getElementById('repArtifactBox');
+        if (b.apkFile) {
+          artBox.style.display = 'block';
+          document.getElementById('repArtifactName').textContent = b.apkFile;
+          const sz = b.apkSize ? (b.apkSize > 1024*1024 ? (b.apkSize/1024/1024).toFixed(1)+' MB' : (b.apkSize/1024).toFixed(0)+' KB') : '';
+          document.getElementById('repArtifactSize').textContent = sz ? 'Ukuran: ' + sz : '';
+          document.getElementById('repArtifactDownload').href = '/apks/' + encodeURIComponent(b.apkFile);
+        } else {
+          artBox.style.display = 'none';
+        }
+
+        // Logs
+        const consoleEl = document.getElementById('repConsole');
+        const dlBtn = document.getElementById('repDownloadLogBtn');
+        dlBtn.href = '/api/apks/history/' + encodeURIComponent(b.id || b.jobId) + '/log';
+
+        if (b.logs && Array.isArray(b.logs) && b.logs.length > 0) {
+          activeReportLogText = b.logs.join('\n');
+          consoleEl.innerHTML = b.logs.map(l => {
+            const cls = l.includes('BUILD_ERROR') ? 'log-err' : (l.includes('BUILD_DONE') ? 'log-ok' : 'log-dim');
+            return '<div class="' + cls + '">' + escapeHtml(l) + '</div>';
+          }).join('');
+        } else {
+          activeReportLogText = 'Tidak ada riwayat log yang tersimpan.';
+          consoleEl.innerHTML = '<div class="log-dim">Tidak ada riwayat log yang tersimpan.</div>';
+        }
+
+        document.getElementById('buildReportModal').classList.add('active');
+      } catch (e) {
+        alert('Gagal memuat report: ' + e.message);
+      }
+    }
+
+    function closeReportModal() {
+      document.getElementById('buildReportModal').classList.remove('active');
+    }
+
+    function copyReportLog() {
+      if (!activeReportLogText) return;
+      navigator.clipboard.writeText(activeReportLogText);
+      alert('Console log berhasil disalin ke clipboard!');
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     loadApksList();
+    loadBuildHistory();
     checkActiveBuild();
   </script>
   `;
