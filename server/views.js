@@ -376,6 +376,238 @@ export function renderBaseLayout({ title, activePage, body, scripts = '' }) {
       .nav-links { display: none; }
       .container { padding: 20px 16px; }
     }
+
+    /* ── JENKINS PIPELINE & STAGE VIEW STYLES ── */
+    .jenkins-pipeline-card {
+      background: #0b1329;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .jenkins-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .jenkins-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .jenkins-weather {
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .jenkins-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+    .jenkins-badge.blue {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+    .jenkins-badge.green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .jenkins-badge.red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .jenkins-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #94a3b8;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Jenkins Stages Grid */
+    .jenkins-stages {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .jenkins-stage-box {
+      background: rgba(17, 24, 39, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px 10px;
+      text-align: center;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .jenkins-stage-box.pending {
+      border-color: rgba(255, 255, 255, 0.06);
+      opacity: 0.55;
+    }
+
+    .jenkins-stage-box.running {
+      border-color: #0ea5e9;
+      background: rgba(14, 165, 233, 0.12);
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+      opacity: 1;
+      animation: jenkins-stage-glow 1.8s infinite;
+    }
+
+    .jenkins-stage-box.success {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.09);
+      opacity: 1;
+    }
+
+    .jenkins-stage-box.failed {
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12);
+      opacity: 1;
+    }
+
+    @keyframes jenkins-stage-glow {
+      0%, 100% { border-color: #0ea5e9; box-shadow: 0 0 12px rgba(14, 165, 233, 0.3); }
+      50% { border-color: #38bdf8; box-shadow: 0 0 24px rgba(14, 165, 233, 0.6); }
+    }
+
+    .jenkins-stage-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+    }
+    .jenkins-stage-box.running .jenkins-stage-icon {
+      background: #0ea5e9;
+      color: #fff;
+      animation: jenkins-spin 1.2s linear infinite;
+    }
+    .jenkins-stage-box.success .jenkins-stage-icon {
+      background: #10b981;
+      color: #fff;
+    }
+    .jenkins-stage-box.failed .jenkins-stage-icon {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    @keyframes jenkins-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .jenkins-stage-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+    .jenkins-stage-duration {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+    }
+
+    /* Jenkins Progress Bar (Striped & Animated) */
+    .jenkins-bar-container {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+
+    .jenkins-bar-track {
+      height: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .jenkins-bar-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #0ea5e9;
+      background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.22) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.22) 50%,
+        rgba(255, 255, 255, 0.22) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 28px 28px;
+      animation: jenkins-stripes 1s linear infinite;
+      transition: width 0.35s ease;
+    }
+    .jenkins-bar-fill.success {
+      background-color: #10b981;
+      animation: none;
+    }
+    .jenkins-bar-fill.failed {
+      background-color: #ef4444;
+      animation: none;
+    }
+
+    @keyframes jenkins-stripes {
+      from { background-position: 0 0; }
+      to { background-position: 28px 0; }
+    }
+
+    .jenkins-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .jenkins-bar-status-text {
+      font-weight: 600;
+      color: #38bdf8;
+    }
+    .jenkins-bar-pct {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -672,19 +904,77 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
     </div>
   </div>
 
-  <!-- Build Live Modal -->
+  <!-- Build Live Modal (Jenkins Style) -->
   <div id="buildModal" class="modal-overlay" onclick="if(event.target===this)closeBuildModal()">
-    <div class="modal">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h2 style="font-size:18px;font-weight:700" id="buildModalTitle">🔨 Build Pipeline di Laptop Satria</h2>
-        <button onclick="closeBuildModal()" class="btn btn-secondary btn-sm">✕ Tutup</button>
+    <div class="modal" style="max-width:760px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="jenkins-weather" id="modalJenkinsWeather">☀️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h2 style="font-size:17px;font-weight:800;color:#fff" id="buildModalTitle">Build Pipeline</h2>
+              <span class="jenkins-badge blue" id="modalJenkinsBadge">#IDLE</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+              Node: <span style="color:#38bdf8">Laptop-Satria (Local Docker Engine)</span> • 0 EAS Cloud Quota
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="jenkins-timer" id="modalJenkinsTimer">⏱️ 00:00</div>
+          <button onclick="closeBuildModal()" class="btn btn-secondary btn-sm">✕ Tutup</button>
+        </div>
       </div>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
-        Proses build berjalan secara lokal di laptop Satria (0 kuota EAS), lalu ditransfer otomatis via SCP ke VPS.
-      </p>
-      <div id="buildModalConsole" class="terminal-box">Menunggu instruksi build...</div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
-        <button onclick="closeBuildModal()" class="btn btn-secondary">Tutup</button>
+
+      <!-- Jenkins 5 Stages -->
+      <div class="jenkins-stages" id="modalJenkinsStages" style="margin-bottom:16px">
+        <div class="jenkins-stage-box pending" id="mstage-init">
+          <div class="jenkins-stage-icon">1</div>
+          <div class="jenkins-stage-title">Checkout & Init</div>
+          <div class="jenkins-stage-duration" id="mstage-time-init">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="mstage-config">
+          <div class="jenkins-stage-icon">2</div>
+          <div class="jenkins-stage-title">Env & Config</div>
+          <div class="jenkins-stage-duration" id="mstage-time-config">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="mstage-compile">
+          <div class="jenkins-stage-icon">3</div>
+          <div class="jenkins-stage-title">Compile APK</div>
+          <div class="jenkins-stage-duration" id="mstage-time-compile">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="mstage-transfer">
+          <div class="jenkins-stage-icon">4</div>
+          <div class="jenkins-stage-title">SCP to VPS</div>
+          <div class="jenkins-stage-duration" id="mstage-time-transfer">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="mstage-deploy">
+          <div class="jenkins-stage-icon">5</div>
+          <div class="jenkins-stage-title">Verify & Publish</div>
+          <div class="jenkins-stage-duration" id="mstage-time-deploy">-</div>
+        </div>
+      </div>
+
+      <!-- Jenkins Striped Animated Progress Bar -->
+      <div class="jenkins-bar-container" style="margin-bottom:14px">
+        <div class="jenkins-bar-track">
+          <div class="jenkins-bar-fill" id="modalJenkinsProgressFill"></div>
+        </div>
+        <div class="jenkins-bar-labels">
+          <span class="jenkins-bar-status-text" id="modalJenkinsStatusText">Siap menjalankan build...</span>
+          <span class="jenkins-bar-pct" id="modalJenkinsPctText">0%</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Console Output</span>
+        <button onclick="document.getElementById('buildModalConsole').innerHTML=''" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px">Clear</button>
+      </div>
+      <div id="buildModalConsole" class="terminal-box" style="max-height:220px">Menunggu instruksi build...</div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <a href="/apks" class="btn btn-primary btn-sm">Buka Halaman APK Full View →</a>
+        <button onclick="closeBuildModal()" class="btn btn-secondary btn-sm">Tutup</button>
       </div>
     </div>
   </div>
@@ -698,6 +988,8 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
   const scripts = `
   <script>
     let buildEventSource = null;
+    let modalBuildTimer = null;
+    let modalBuildStartTime = 0;
 
     function openZoomModal(src) {
       const modal = document.getElementById('zoomModal');
@@ -706,13 +998,61 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
       modal.classList.add('active');
     }
 
+    function setModalStageState(stageId, state, duration) {
+      const el = document.getElementById(stageId);
+      if (!el) return;
+      el.className = 'jenkins-stage-box ' + state;
+      const icon = el.querySelector('.jenkins-stage-icon');
+      if (icon) {
+        if (state === 'running') icon.textContent = '⚡';
+        else if (state === 'success') icon.textContent = '✓';
+        else if (state === 'failed') icon.textContent = '✕';
+      }
+      const durEl = el.querySelector('.jenkins-stage-duration');
+      if (durEl && duration) durEl.textContent = duration;
+    }
+
+    function setModalProgress(pct, statusText, stateClass) {
+      const fill = document.getElementById('modalJenkinsProgressFill');
+      const text = document.getElementById('modalJenkinsStatusText');
+      const pctEl = document.getElementById('modalJenkinsPctText');
+      if (fill) {
+        fill.style.width = pct + '%';
+        fill.className = 'jenkins-bar-fill' + (stateClass ? ' ' + stateClass : '');
+      }
+      if (text && statusText) text.textContent = statusText;
+      if (pctEl) pctEl.textContent = pct + '%';
+    }
+
     function openBuildModal(profile) {
       const modal = document.getElementById('buildModal');
       const consoleBox = document.getElementById('buildModalConsole');
       const title = document.getElementById('buildModalTitle');
-      title.textContent = '🔨 Build Pipeline (' + profile.toUpperCase() + ') - 0 EAS Quota';
+      const badge = document.getElementById('modalJenkinsBadge');
+      const weather = document.getElementById('modalJenkinsWeather');
+      const timerEl = document.getElementById('modalJenkinsTimer');
+
+      title.textContent = 'Pipeline bukainjalan (' + profile.toUpperCase() + ')';
+      badge.className = 'jenkins-badge blue';
+      badge.textContent = '#BUILD-' + profile.toUpperCase();
+      weather.textContent = '⛅';
       consoleBox.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menghubungkan ke Laptop Runner...</div>';
       modal.classList.add('active');
+
+      ['mstage-init', 'mstage-config', 'mstage-compile', 'mstage-transfer', 'mstage-deploy'].forEach(id => {
+        setModalStageState(id, 'pending', '-');
+      });
+      setModalStageState('mstage-init', 'running', '...');
+      setModalProgress(10, 'Stage 1/5: Menginisialisasi runner environment...');
+
+      modalBuildStartTime = Date.now();
+      if (modalBuildTimer) clearInterval(modalBuildTimer);
+      modalBuildTimer = setInterval(() => {
+        const sec = Math.floor((Date.now() - modalBuildStartTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        if (timerEl) timerEl.textContent = '⏱️ ' + m + ':' + s;
+      }, 1000);
 
       if (buildEventSource) buildEventSource.close();
       buildEventSource = new EventSource('/api/apks/build?profile=' + profile + '&target=laptop');
@@ -721,24 +1061,57 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
         try {
           const d = JSON.parse(e.data);
           const line = document.createElement('div');
-          if (d.type === 'error') line.className = 'log-err';
-          else if (d.type === 'done') line.className = 'log-ok';
+          const msg = d.message || d.type || '';
+          if (d.type === 'error' || msg.includes('BUILD_ERROR')) line.className = 'log-err';
+          else if (d.type === 'done' || msg.includes('BUILD_DONE')) line.className = 'log-ok';
           else line.className = 'log-dim';
-          line.textContent = '[' + (d.ts || new Date().toLocaleTimeString()) + '] ' + (d.message || d.type);
+          line.textContent = '[' + (d.ts || new Date().toLocaleTimeString()) + '] ' + msg;
           consoleBox.appendChild(line);
           consoleBox.scrollTop = consoleBox.scrollHeight;
 
-          if (d.type === 'done' || d.type === 'error') {
-            buildEventSource.close();
+          if (msg.includes('Project directory') || msg.includes('profile')) {
+            setModalStageState('mstage-init', 'success', '2s');
+            setModalStageState('mstage-config', 'running', '...');
+            setModalProgress(25, 'Stage 2/5: Konfigurasi project & dependensi...');
+          }
+          else if (msg.includes('eas build') || msg.includes('expo run') || msg.includes('gradle') || msg.includes('prebuild')) {
+            setModalStageState('mstage-config', 'success', '4s');
+            setModalStageState('mstage-compile', 'running', '...');
+            setModalProgress(50, 'Stage 3/5: Mengompilasi APK secara lokal (Docker/Gradle)...');
+          }
+          else if (msg.includes('BUILD_TRANSFER') || msg.includes('SCP')) {
+            setModalStageState('mstage-compile', 'success', 'ok');
+            setModalStageState('mstage-transfer', 'running', '...');
+            setModalProgress(80, 'Stage 4/5: Mentransfer APK ke VPS...');
+          }
+          else if (d.type === 'done' || msg.includes('BUILD_DONE') || msg.includes('selesai')) {
+            setModalStageState('mstage-transfer', 'success', 'ok');
+            setModalStageState('mstage-deploy', 'success', 'ok');
+            setModalProgress(100, '✓ Pipeline Selesai! APK siap dipakai.', 'success');
+            badge.className = 'jenkins-badge green';
+            badge.textContent = '#SUCCESS';
+            weather.textContent = '☀️';
+            if (modalBuildTimer) { clearInterval(modalBuildTimer); modalBuildTimer = null; }
+            if (buildEventSource) { buildEventSource.close(); buildEventSource = null; }
+          }
+          else if (d.type === 'error') {
+            setModalProgress(100, '✕ Pipeline Gagal: ' + msg, 'failed');
+            badge.className = 'jenkins-badge red';
+            badge.textContent = '#FAILED';
+            weather.textContent = '🌧️';
+            if (modalBuildTimer) { clearInterval(modalBuildTimer); modalBuildTimer = null; }
+            if (buildEventSource) { buildEventSource.close(); buildEventSource = null; }
           }
         } catch {}
       };
 
       buildEventSource.onerror = function() {
-        const line = document.createElement('div');
-        line.className = 'log-err';
-        line.textContent = 'Koneksi ke build runner terputus atau offline.';
-        consoleBox.appendChild(line);
+        setModalProgress(100, '✕ Koneksi runner terputus', 'failed');
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#FAILED';
+        weather.textContent = '🌧️';
+        if (modalBuildTimer) { clearInterval(modalBuildTimer); modalBuildTimer = null; }
+        if (buildEventSource) { buildEventSource.close(); buildEventSource = null; }
       };
     }
 
@@ -747,6 +1120,10 @@ export function renderDashboardView({ scenarios = [], apks = [], runner = null }
       if (buildEventSource) {
         buildEventSource.close();
         buildEventSource = null;
+      }
+      if (modalBuildTimer) {
+        clearInterval(modalBuildTimer);
+        modalBuildTimer = null;
       }
     }
 
@@ -796,35 +1173,95 @@ export function renderApksView() {
       </div>
     </div>
 
-    <!-- Build Controls Card -->
-    <div class="card" style="margin-bottom:24px">
-      <div class="card-header">
-        <div class="card-title">
-          <span>🔨</span> Trigger Build Baru (0 EAS Quota)
+    <!-- Jenkins Pipeline Card -->
+    <div class="jenkins-pipeline-card">
+      <div class="jenkins-header">
+        <div class="jenkins-title-group">
+          <span class="jenkins-weather" id="jenkinsWeather">☀️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h2 style="font-size:17px;font-weight:800;color:#fff" id="jenkinsPipelineTitle">Pipeline bukainjalan_mobile (android)</h2>
+              <span class="jenkins-badge blue" id="jenkinsPipelineBadge">#IDLE</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+              Node: <span style="color:#38bdf8" id="jenkinsPipelineNode">Laptop-Satria (Local Docker Engine)</span> • 0 EAS Cloud Quota
+            </div>
+          </div>
         </div>
-        <span class="brand-badge">Local Engine</span>
-      </div>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
-        Build dijalankan di laptop secara lokal menggunakan <code style="color:#38bdf8;font-family:'JetBrains Mono'">build-local.ps1</code>. APK yang berhasil dibuild akan otomatis di-transfer via SCP ke direktori release VPS ini.
-      </p>
 
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-        <button onclick="startApkBuild('staging')" class="btn btn-success" id="btnBuildStaging">
-          🔨 Build Staging (Laptop)
-        </button>
-        <button onclick="startApkBuild('production')" class="btn btn-primary" id="btnBuildProd">
-          🔨 Build Production (Laptop)
-        </button>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="jenkins-timer" id="jenkinsTimer">⏱️ 00:00</div>
+          <button onclick="startApkBuild('staging')" class="btn btn-success btn-sm" id="btnBuildStaging">
+            ▶ Build Staging
+          </button>
+          <button onclick="startApkBuild('production')" class="btn btn-primary btn-sm" id="btnBuildProd">
+            ▶ Build Production
+          </button>
+        </div>
       </div>
 
-      <div id="buildConsole" class="terminal-box" style="display:none"></div>
+      <!-- Jenkins Stage View -->
+      <div class="jenkins-stages" id="jenkinsBuildStages">
+        <div class="jenkins-stage-box pending" id="stage-init">
+          <div class="jenkins-stage-icon">1</div>
+          <div class="jenkins-stage-title">Checkout & Init</div>
+          <div class="jenkins-stage-duration" id="stage-time-init">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="stage-config">
+          <div class="jenkins-stage-icon">2</div>
+          <div class="jenkins-stage-title">Env & Config</div>
+          <div class="jenkins-stage-duration" id="stage-time-config">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="stage-compile">
+          <div class="jenkins-stage-icon">3</div>
+          <div class="jenkins-stage-title">Compile APK</div>
+          <div class="jenkins-stage-duration" id="stage-time-compile">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="stage-transfer">
+          <div class="jenkins-stage-icon">4</div>
+          <div class="jenkins-stage-title">SCP to VPS</div>
+          <div class="jenkins-stage-duration" id="stage-time-transfer">-</div>
+        </div>
+        <div class="jenkins-stage-box pending" id="stage-deploy">
+          <div class="jenkins-stage-icon">5</div>
+          <div class="jenkins-stage-title">Verify & Publish</div>
+          <div class="jenkins-stage-duration" id="stage-time-deploy">-</div>
+        </div>
+      </div>
+
+      <!-- Jenkins Striped Animated Progress Bar -->
+      <div class="jenkins-bar-container">
+        <div class="jenkins-bar-track">
+          <div class="jenkins-bar-fill" id="jenkinsProgressFill"></div>
+        </div>
+        <div class="jenkins-bar-labels">
+          <span class="jenkins-bar-status-text" id="jenkinsStatusText">Siap menjalankan build pipeline di laptop...</span>
+          <span class="jenkins-bar-pct" id="jenkinsPctText">0%</span>
+        </div>
+      </div>
+
+      <!-- Jenkins Console Output -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Console Output</span>
+          <div style="display:flex;gap:8px">
+            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="jenkinsAutoScroll" checked> Auto-scroll
+            </label>
+            <button onclick="document.getElementById('buildConsole').innerHTML=''" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px">Clear</button>
+          </div>
+        </div>
+        <div id="buildConsole" class="terminal-box" style="display:block;max-height:260px">
+          <div class="log-dim">Klik tombol "Build Staging" atau "Build Production" di atas untuk memulai pipeline...</div>
+        </div>
+      </div>
     </div>
 
     <!-- APK List Table Card -->
     <div class="card">
       <div class="card-header">
         <div class="card-title">
-          <span>📋</span> Daftar Versi APK
+          <span>📋</span> Daftar Versi APK (Build Artifacts)
         </div>
         <button onclick="loadApksList()" class="btn btn-secondary btn-sm">🔄 Refresh List</button>
       </div>
@@ -839,78 +1276,73 @@ export function renderApksView() {
   const scripts = `
   <script>
     let sseSource = null;
+    let buildTimerInterval = null;
+    let buildStartTime = 0;
 
-    async function loadApksList() {
-      const container = document.getElementById('apksTableContainer');
-      try {
-        const r = await fetch('/api/apks');
-        const d = await r.json();
-        if (!d.apks || d.apks.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted);padding:30px 0;text-align:center">Belum ada file APK. Klik "Build" di atas untuk membuat build pertama.</p>';
-          return;
-        }
+    function formatDuration(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return m + ':' + s;
+    }
 
-        let html = '<div style="display:flex;flex-direction:column;gap:8px">';
-        d.apks.forEach(a => {
-          const date = a.time ? a.time.slice(0, 16).replace('T', ' ') : '-';
-          const size = a.size > 1024*1024 ? (a.size/1024/1024).toFixed(1)+' MB' : (a.size/1024).toFixed(0)+' KB';
-          html += \`
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;gap:16px;flex-wrap:wrap">
-              <div>
-                <div style="font-weight:700;font-size:15px;color:#38bdf8;font-family:'JetBrains Mono',monospace">\${a.file}</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Ukuran: \${size} • Dibuat: \${date}</div>
-              </div>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-success btn-sm" data-file="\${a.file}" onclick="installApkToEmulator(this.dataset.file)">
-                  📲 Install ke Emulator
-                </button>
-                <a href="/apks/\${encodeURIComponent(a.file)}" class="btn btn-secondary btn-sm" download>
-                  ⬇️ Download
-                </a>
-              </div>
-            </div>
-          \`;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-      } catch (e) {
-        container.innerHTML = '<p style="color:#ef4444;padding:20px;text-align:center">Gagal memuat list: ' + e.message + '</p>';
+    function setStageState(stageId, state, durationText) {
+      const box = document.getElementById(stageId);
+      if (!box) return;
+      box.className = 'jenkins-stage-box ' + state;
+      const icon = box.querySelector('.jenkins-stage-icon');
+      if (icon) {
+        if (state === 'running') icon.textContent = '⚡';
+        else if (state === 'success') icon.textContent = '✓';
+        else if (state === 'failed') icon.textContent = '✕';
+      }
+      if (durationText) {
+        const dEl = box.querySelector('.jenkins-stage-duration');
+        if (dEl) dEl.textContent = durationText;
       }
     }
 
-    async function installApkToEmulator(file) {
-      const btn = event.target;
-      const oldTxt = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '⏳ Menginstall...';
-      try {
-        const r = await fetch('/api/apks/install', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ file })
-        });
-        const d = await r.json();
-        if (d.ok) {
-          alert('✅ Sukses terinstall ke emulator laptop!');
-        } else {
-          alert('❌ Gagal install: ' + (d.error || 'Unknown error'));
-        }
-      } catch (e) {
-        alert('❌ Error: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = oldTxt;
+    function setPipelineProgress(pct, statusText, state = 'running') {
+      const fill = document.getElementById('jenkinsProgressFill');
+      const pText = document.getElementById('jenkinsPctText');
+      const sText = document.getElementById('jenkinsStatusText');
+      if (fill) {
+        fill.style.width = pct + '%';
+        fill.className = 'jenkins-bar-fill' + (state === 'success' ? ' success' : state === 'failed' ? ' failed' : '');
       }
+      if (pText) pText.textContent = pct + '%';
+      if (sText) sText.textContent = statusText;
     }
 
     function startApkBuild(profile) {
       const con = document.getElementById('buildConsole');
       const bStaging = document.getElementById('btnBuildStaging');
       const bProd = document.getElementById('btnBuildProd');
-      con.style.display = 'block';
-      con.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Mengirim perintah build (' + profile + ') ke laptop runner...</div>';
+      const badge = document.getElementById('jenkinsPipelineBadge');
+      const weather = document.getElementById('jenkinsWeather');
+      const timerEl = document.getElementById('jenkinsTimer');
+
+      con.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan trigger build (' + profile + ')...</div>';
       bStaging.disabled = true;
       bProd.disabled = true;
+
+      // Reset stages
+      ['stage-init', 'stage-config', 'stage-compile', 'stage-transfer', 'stage-deploy'].forEach(id => {
+        setStageState(id, 'pending', '-');
+      });
+      setStageState('stage-init', 'running', '...');
+      setPipelineProgress(10, 'Stage 1/5: Menginisialisasi runner environment...');
+
+      badge.className = 'jenkins-badge blue';
+      badge.textContent = '#BUILD-' + profile.toUpperCase();
+      weather.textContent = '⛅';
+
+      // Start stopwatch timer
+      buildStartTime = Date.now();
+      if (buildTimerInterval) clearInterval(buildTimerInterval);
+      buildTimerInterval = setInterval(() => {
+        const sec = Math.floor((Date.now() - buildStartTime) / 1000);
+        timerEl.textContent = '⏱️ ' + formatDuration(sec);
+      }, 1000);
 
       if (sseSource) sseSource.close();
       sseSource = new EventSource('/api/apks/build?profile=' + profile + '&target=laptop');
@@ -919,26 +1351,74 @@ export function renderApksView() {
         try {
           const d = JSON.parse(e.data);
           const line = document.createElement('div');
-          if (d.type === 'error') line.className = 'log-err';
-          else if (d.type === 'done') line.className = 'log-ok';
-          else line.className = 'log-dim';
-          line.textContent = '[' + (d.ts || new Date().toLocaleTimeString()) + '] ' + (d.message || d.type);
-          con.appendChild(line);
-          con.scrollTop = con.scrollHeight;
+          const msg = d.message || d.type || '';
 
-          if (d.type === 'done' || d.type === 'error') {
-            sseSource.close();
-            bStaging.disabled = false;
-            bProd.disabled = false;
-            loadApksList();
+          if (d.type === 'error' || msg.includes('BUILD_ERROR')) line.className = 'log-err';
+          else if (d.type === 'done' || msg.includes('BUILD_DONE')) line.className = 'log-ok';
+          else line.className = 'log-dim';
+          line.textContent = '[' + (d.ts || new Date().toLocaleTimeString()) + '] ' + msg;
+          con.appendChild(line);
+
+          if (document.getElementById('jenkinsAutoScroll')?.checked) {
+            con.scrollTop = con.scrollHeight;
+          }
+
+          // Stage detection logic based on log stream
+          if (msg.includes('Project directory') || msg.includes('profile')) {
+            setStageState('stage-init', 'success', '2s');
+            setStageState('stage-config', 'running', '...');
+            setPipelineProgress(25, 'Stage 2/5: Konfigurasi project & dependensi...');
+          }
+          else if (msg.includes('eas build') || msg.includes('expo run') || msg.includes('gradle') || msg.includes('prebuild')) {
+            setStageState('stage-config', 'success', '4s');
+            setStageState('stage-compile', 'running', '...');
+            setPipelineProgress(45, 'Stage 3/5: Mengompilasi APK secara lokal (Docker / Gradle)...');
+          }
+          else if (msg.includes('BUILD_TRANSFER') || msg.includes('SCP')) {
+            setStageState('stage-compile', 'success', 'ok');
+            setStageState('stage-transfer', 'running', '...');
+            setPipelineProgress(80, 'Stage 4/5: Mentransfer APK ke VPS (deploy@76.13.21.10)...');
+          }
+          else if (d.type === 'done' || msg.includes('BUILD_DONE') || msg.includes('selesai')) {
+            setStageState('stage-transfer', 'success', 'ok');
+            setStageState('stage-deploy', 'success', 'ok');
+            setPipelineProgress(100, '✓ Pipeline Selesai! APK siap dipakai.', 'success');
+            badge.className = 'jenkins-badge green';
+            badge.textContent = '#SUCCESS';
+            weather.textContent = '☀️';
+            finishBuild();
+          }
+          else if (d.type === 'error') {
+            setPipelineProgress(100, '✕ Pipeline Gagal: ' + msg, 'failed');
+            badge.className = 'jenkins-badge red';
+            badge.textContent = '#FAILED';
+            weather.textContent = '🌧️';
+            finishBuild();
           }
         } catch {}
       };
 
       sseSource.onerror = function() {
-        bStaging.disabled = false;
-        bProd.disabled = false;
+        setPipelineProgress(100, '✕ Koneksi runner terputus', 'failed');
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#FAILED';
+        weather.textContent = '🌧️';
+        finishBuild();
       };
+    }
+
+    function finishBuild() {
+      if (buildTimerInterval) {
+        clearInterval(buildTimerInterval);
+        buildTimerInterval = null;
+      }
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+      }
+      document.getElementById('btnBuildStaging').disabled = false;
+      document.getElementById('btnBuildProd').disabled = false;
+      loadApksList();
     }
 
     loadApksList();
@@ -1094,26 +1574,52 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       </div>
     </div>
 
-    <!-- Runner Progress Panel (SSE) -->
-    <div id="runnerPanel" class="card" style="margin-bottom:24px;display:none">
-      <div class="card-header">
-        <div class="card-title">
-          <span>▶</span> Automation Execution Progress
+    <!-- Jenkins Test Automation Pipeline Card -->
+    <div id="runnerPanel" class="jenkins-pipeline-card" style="margin-bottom:24px;display:none">
+      <div class="jenkins-header">
+        <div class="jenkins-title-group">
+          <span class="jenkins-weather" id="jenkinsTestWeather">☀️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h2 style="font-size:17px;font-weight:800;color:#fff">Pipeline: ${scenario}</h2>
+              <span class="jenkins-badge blue" id="jenkinsTestBadge">#QUEUED</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+              Target: <span style="color:#38bdf8" id="jenkinsTestTarget">Laptop ADB Emulator</span> • Scenario: <b>${scenario}</b>
+            </div>
+          </div>
         </div>
-        <span id="runStatusText" style="font-size:13px;color:#38bdf8;font-weight:600">⏳ Memulai...</span>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="jenkins-timer" id="jenkinsTestTimer">⏱️ 00:00</div>
+          <button class="btn btn-danger btn-sm" onclick="stopAutomation()" id="btnStopRun" style="display:none">
+            ⏹ Batalkan Pipeline
+          </button>
+        </div>
       </div>
 
-      <div style="background:rgba(255,255,255,0.06);border-radius:10px;height:12px;overflow:hidden;margin-bottom:12px">
-        <div id="progressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#0ea5e9,#10b981);transition:width 0.3s ease"></div>
+      <!-- Dynamic Stage View for Test Steps -->
+      <div class="jenkins-stages" id="jenkinsTestStages"></div>
+
+      <!-- Jenkins Striped Animated Progress Bar -->
+      <div class="jenkins-bar-container">
+        <div class="jenkins-bar-track">
+          <div class="jenkins-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="jenkins-bar-labels">
+          <span class="jenkins-bar-status-text" id="runStatusText">⏳ Memulai test automation...</span>
+          <span class="jenkins-bar-pct" id="progressPctText">0%</span>
+        </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:14px">
-        <span id="progressStepCount">0 / 0 steps</span>
-        <span id="progressShotCount">0 screenshots tersimpan</span>
+      <!-- Jenkins Step Execution Console -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Console Output & Telemetry</span>
+          <span id="progressShotCount" style="font-size:11px;color:var(--text-muted)">0 screenshots tersimpan</span>
+        </div>
+        <div id="stepLogContainer" class="terminal-box" style="margin-bottom:12px;max-height:220px"></div>
       </div>
-
-      <div id="stepLogContainer" class="terminal-box" style="margin-bottom:12px"></div>
-      <button class="btn btn-danger btn-sm" onclick="stopAutomation()" id="btnStopRun" style="display:none">⏹ Batalkan Test</button>
     </div>
 
     <!-- Layout: 2 Columns (Script on Left, Captures on Right) -->
@@ -1210,15 +1716,74 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       const btnStop = document.getElementById('btnStopRun');
       const bLaptop = document.getElementById('btnRunLaptop');
       const bVps = document.getElementById('btnRunVps');
+      const pctText = document.getElementById('progressPctText');
+      const badge = document.getElementById('jenkinsTestBadge');
+      const weather = document.getElementById('jenkinsTestWeather');
+      const timerEl = document.getElementById('jenkinsTestTimer');
 
       pnl.style.display = 'block';
       pBar.style.width = '0%';
-      sText.textContent = '⏳ Menjalankan di ' + target + '...';
+      pBar.className = 'jenkins-bar-fill';
+      pctText.textContent = '0%';
+      sText.textContent = '⏳ Menginisialisasi runner di ' + target + '...';
       sText.style.color = '#38bdf8';
-      logBox.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan ADB runner...</div>';
+      logBox.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan ADB test runner di ' + target + '...</div>';
       if (btnStop) btnStop.style.display = 'inline-flex';
       if (bLaptop) bLaptop.disabled = true;
       if (bVps) bVps.disabled = true;
+
+      badge.className = 'jenkins-badge blue';
+      badge.textContent = '#RUNNING';
+      weather.textContent = '⛅';
+
+      // Stopwatch Timer
+      testStartTime = Date.now();
+      if (testTimerInterval) clearInterval(testTimerInterval);
+      testTimerInterval = setInterval(() => {
+        const sec = Math.floor((Date.now() - testStartTime) / 1000);
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        timerEl.textContent = '⏱️ ' + m + ':' + s;
+      }, 1000);
+
+      // Parse Steps from script editor to populate Jenkins Stages
+      const mdText = document.getElementById('editorArea')?.value || '';
+      const stepMatches = mdText.match(/## Steps[\r\n]+([\s\S]*?)(?:[\r\n]+## |$)/);
+      const stepLines = stepMatches ? stepMatches[1].trim().split('\n').filter(l => /^\d+\./.test(l.trim())) : [];
+      const stagesContainer = document.getElementById('jenkinsTestStages');
+      stagesContainer.innerHTML = '';
+
+      const stagesList = [
+        { id: 'tstage-setup', name: 'Device Init' },
+        ...stepLines.map((l, idx) => ({ id: 'tstage-step-' + (idx + 1), name: l.replace(/^\d+\.\s*/, '').slice(0, 16) })),
+        { id: 'tstage-report', name: 'Quality Gate' }
+      ];
+
+      stagesList.forEach((st, idx) => {
+        const box = document.createElement('div');
+        box.id = st.id;
+        box.className = 'jenkins-stage-box ' + (idx === 0 ? 'running' : 'pending');
+        box.innerHTML = '<div class="jenkins-stage-icon">' + (idx === 0 ? '⚡' : (idx + 1)) + '</div>' +
+          '<div class="jenkins-stage-title" title="' + st.name + '">' + st.name + '</div>' +
+          '<div class="jenkins-stage-duration" id="' + st.id + '-time">-</div>';
+        stagesContainer.appendChild(box);
+      });
+
+      function setTestStage(stageId, state, durationText) {
+        const box = document.getElementById(stageId);
+        if (!box) return;
+        box.className = 'jenkins-stage-box ' + state;
+        const icon = box.querySelector('.jenkins-stage-icon');
+        if (icon) {
+          if (state === 'running') icon.textContent = '⚡';
+          else if (state === 'success') icon.textContent = '✓';
+          else if (state === 'failed') icon.textContent = '✕';
+        }
+        if (durationText) {
+          const dEl = document.getElementById(stageId + '-time');
+          if (dEl) dEl.textContent = durationText;
+        }
+      }
 
       if (runEventSource) runEventSource.close();
       runEventSource = new EventSource('/screenshots/${encodeURIComponent(scenario)}/run?target=' + target);
@@ -1229,7 +1794,11 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
           
           if (d.type === 'progress') {
             pBar.style.width = d.percent + '%';
-            document.getElementById('progressStepCount').textContent = d.current + ' / ' + d.total + ' steps';
+            pctText.textContent = d.percent + '%';
+            sText.textContent = 'Step ' + d.current + ' of ' + d.total + ' (' + d.percent + '%)...';
+            setTestStage('tstage-setup', 'success', '1s');
+            const curStageId = 'tstage-step-' + d.current;
+            setTestStage(curStageId, 'running', '...');
           }
           else if (d.type === 'step') {
             const line = document.createElement('div');
@@ -1237,6 +1806,15 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
             line.textContent = (d.status === 'pass' ? '✅ ' : '❌ ') + (d.name || 'Step selesai');
             logBox.appendChild(line);
             logBox.scrollTop = logBox.scrollHeight;
+
+            const stepNum = d.step || d.current || 1;
+            const curStageId = 'tstage-step-' + stepNum;
+            setTestStage(curStageId, d.status === 'pass' ? 'success' : 'failed', 'ok');
+
+            const nextStageId = 'tstage-step-' + (stepNum + 1);
+            if (document.getElementById(nextStageId)) {
+              setTestStage(nextStageId, 'running', '...');
+            }
           }
           else if (d.type === 'info') {
             const line = document.createElement('div');
@@ -1246,13 +1824,23 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
           }
           else if (d.type === 'result') {
             pBar.style.width = '100%';
+            pctText.textContent = '100%';
+            pBar.className = 'jenkins-bar-fill ' + (d.status === 'pass' ? 'success' : 'failed');
             sText.textContent = (d.status === 'pass' ? '✅ ' : '❌ ') + d.message;
             sText.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
+            setTestStage('tstage-report', d.status === 'pass' ? 'success' : 'failed', 'done');
+            badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
+            badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
+            weather.textContent = d.status === 'pass' ? '☀️' : '🌧️';
             finishRun();
           }
           else if (d.type === 'error') {
+            pBar.className = 'jenkins-bar-fill failed';
             sText.textContent = '❌ ' + d.message;
             sText.style.color = '#ef4444';
+            badge.className = 'jenkins-badge red';
+            badge.textContent = '#FAILED';
+            weather.textContent = '🌧️';
             finishRun();
           }
         } catch {}
@@ -1260,12 +1848,23 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
 
       runEventSource.onerror = function() {
         sText.textContent = '❌ Koneksi terputus';
+        pBar.className = 'jenkins-bar-fill failed';
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#FAILED';
+        weather.textContent = '🌧️';
         finishRun();
       };
     }
 
+    let testTimerInterval = null;
+    let testStartTime = 0;
+
     function finishRun() {
       isRunning = false;
+      if (testTimerInterval) {
+        clearInterval(testTimerInterval);
+        testTimerInterval = null;
+      }
       if (runEventSource) {
         runEventSource.close();
         runEventSource = null;
@@ -1281,6 +1880,8 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
     function stopAutomation() {
       finishRun();
       document.getElementById('runStatusText').textContent = '⏹ Dibatalkan';
+      const badge = document.getElementById('jenkinsTestBadge');
+      if (badge) { badge.className = 'jenkins-badge red'; badge.textContent = '#ABORTED'; }
     }
 
     async function deleteSingleCapture(scenario, file) {

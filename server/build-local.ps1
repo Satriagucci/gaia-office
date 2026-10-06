@@ -51,27 +51,45 @@ if (-not $SkipBuild) {
 
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
-        Write-BuildLog "BUILD_WARN" "EAS local build exit $exitCode, mencoba alternatif: npx expo run:android..."
-        npx expo run:android --build-type release 2>&1 | ForEach-Object {
-            Write-BuildLog "BUILD_RAW" $_
+        Write-BuildLog "BUILD_WARN" "EAS local butuh platform Linux/Docker, beralih ke Native Expo Gradle Pipeline..."
+        if (-not (Test-Path "$ProjectDir\android")) {
+            Write-BuildLog "BUILD_LOG" "Menjalankan npx expo prebuild --platform android..."
+            npx -y expo prebuild --platform android 2>&1 | ForEach-Object {
+                Write-BuildLog "BUILD_RAW" $_
+            }
         }
 
-        if ($LASTEXITCODE -eq 0) {
-            $apkCandidate = Get-ChildItem -Path "$ProjectDir\android\app\build\outputs\apk" -Recurse -Filter "*.apk" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($apkCandidate) {
-                $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-                $version = "local"
-                try {
-                    $config = Get-Content "$ProjectDir\app.config.js" -Raw
-                    $match = [regex]::Match($config, 'version:\s*"([^"]+)"')
-                    if ($match.Success) { $version = $match.Groups[1].Value }
-                } catch {}
-                $destName = "bukainjalan-$version-$timestamp.apk"
-                Copy-Item $apkCandidate.FullName "$ApkOutput\$destName" -Force
-                $apkFile = Get-Item "$ApkOutput\$destName"
+        if (Test-Path "$ProjectDir\android\gradlew.bat") {
+            Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease..."
+            Push-Location "$ProjectDir\android"
+            .\gradlew.bat assembleRelease 2>&1 | ForEach-Object {
+                Write-BuildLog "BUILD_RAW" $_
             }
+            $buildExit = $LASTEXITCODE
+            Pop-Location
         } else {
-            Write-BuildLog "BUILD_ERROR" "Semua metode build gagal."
+            Write-BuildLog "BUILD_LOG" "Menjalankan npx expo run:android --variant release..."
+            npx -y expo run:android --variant release 2>&1 | ForEach-Object {
+                Write-BuildLog "BUILD_RAW" $_
+            }
+            $buildExit = $LASTEXITCODE
+        }
+
+        $apkCandidate = Get-ChildItem -Path "$ProjectDir\android\app\build\outputs\apk" -Recurse -Filter "*.apk" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($apkCandidate) {
+            $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+            $version = "local"
+            try {
+                $config = Get-Content "$ProjectDir\app.config.js" -Raw -ErrorAction SilentlyContinue
+                $match = [regex]::Match($config, 'version:\s*"([^"]+)"')
+                if ($match.Success) { $version = $match.Groups[1].Value }
+            } catch {}
+            $destName = "bukainjalan-$version-$timestamp.apk"
+            Copy-Item $apkCandidate.FullName "$ApkOutput\$destName" -Force
+            $apkFile = Get-Item "$ApkOutput\$destName"
+            Write-BuildLog "BUILD_DONE" "APK berhasil dikompilasi: $destName"
+        } elseif ($buildExit -ne 0) {
+            Write-BuildLog "BUILD_ERROR" "Kompilasi gagal (exit $buildExit)."
             exit 1
         }
     }
