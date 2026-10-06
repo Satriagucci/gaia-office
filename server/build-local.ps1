@@ -60,6 +60,8 @@ if (-not $SkipBuild) {
         }
 
         if (Test-Path "$ProjectDir\android\gradlew.bat") {
+            Write-BuildLog "BUILD_LOG" "Membersihkan cache C++ (.cxx) lama agar tidak terjadi loop dirty build.ninja..."
+            Remove-Item -Recurse -Force "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx" -ErrorAction SilentlyContinue
             Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease..."
             Push-Location "$ProjectDir\android"
             .\gradlew.bat assembleRelease 2>&1 | ForEach-Object {

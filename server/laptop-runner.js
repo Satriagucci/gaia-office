@@ -11,15 +11,21 @@
 import WebSocket from 'ws'
 import { spawn, execSync } from 'child_process'
 import { readFileSync, existsSync, unlinkSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 const VPS_HOST = process.env.VPS_HOST || '100.89.171.112'
 const VPS_PORT = process.env.VPS_PORT || '8788'
 const WS_URL = `ws://${VPS_HOST}:${VPS_PORT}/chat`
 const HTTP_URL = `http://${VPS_HOST}:${VPS_PORT}`
 
-const BUILD_SCRIPT = 'C:\\Users\\SatriaGucci\\build-local.ps1'
+const BUILD_SCRIPT = existsSync(join(__dirname, 'build-local.ps1')) 
+  ? join(__dirname, 'build-local.ps1') 
+  : 'C:\\Users\\SatriaGucci\\build-local.ps1'
 
 console.log('╔═══════════════════════════════════════════════════════╗')
 console.log('║       GAIA Office — Local Laptop Runner Agent         ║')

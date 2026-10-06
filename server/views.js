@@ -1606,18 +1606,18 @@ export function renderApksView({ builds = [] } = {}) {
             : '<span style="color:var(--text-muted);font-size:11px">-</span>';
 
           return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
-            '<td style="padding:12px 14px;font-family:\'JetBrains Mono\',monospace;font-weight:700">' +
-              '<a href="javascript:void(0)" onclick="openBuildReport(\'' + (b.id || b.jobId) + '\')" style="color:#38bdf8;text-decoration:none">#' + (b.id || b.jobId.slice(-4)) + '</a>' +
+            '<td style="padding:12px 14px;font-family:monospace;font-weight:700">' +
+              '<a href="javascript:void(0)" class="btn-open-report" data-report-id="' + (b.id || b.jobId) + '" style="color:#38bdf8;text-decoration:none">#' + (b.id || (b.jobId ? b.jobId.slice(-4) : '1')) + '</a>' +
             '</td>' +
             '<td style="padding:12px 14px;font-size:18px">' + weather + '</td>' +
             '<td style="padding:12px 14px"><span class="jenkins-badge ' + badgeClass + '" style="font-size:10px">#' + b.status + '</span></td>' +
             '<td style="padding:12px 14px;font-size:12px;font-weight:600">' + (b.profile || 'staging') + '</td>' +
             '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + (b.node || 'Laptop-Satria') + '</td>' +
-            '<td style="padding:12px 14px;font-family:\'JetBrains Mono\',monospace;font-size:12px">' + durationStr + '</td>' +
+            '<td style="padding:12px 14px;font-family:monospace;font-size:12px">' + durationStr + '</td>' +
             '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + dateStr + '</td>' +
             '<td style="padding:12px 14px">' + artifactHtml + '</td>' +
             '<td style="padding:12px 14px;text-align:right">' +
-              '<button onclick="openBuildReport(\'' + (b.id || b.jobId) + '\')" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px">📑 Report</button>' +
+              '<button class="btn btn-secondary btn-sm btn-open-report" data-report-id="' + (b.id || b.jobId) + '" style="padding:3px 8px;font-size:11px">📑 Report</button>' +
             '</td>' +
           '</tr>';
         }).join('');
@@ -1640,6 +1640,10 @@ export function renderApksView({ builds = [] } = {}) {
             '<tbody>' + rows + '</tbody>' +
           '</table>' +
         '</div>';
+
+        container.querySelectorAll('.btn-open-report').forEach(el => {
+          el.addEventListener('click', () => openBuildReport(el.dataset.reportId));
+        });
       } catch (e) {
         container.innerHTML = '<p style="color:#f87171;padding:20px 0;text-align:center">Gagal memuat riwayat: ' + e.message + '</p>';
       }
@@ -1722,7 +1726,7 @@ export function renderApksView({ builds = [] } = {}) {
         dlBtn.href = '/api/apks/history/' + encodeURIComponent(b.id || b.jobId) + '/log';
 
         if (b.logs && Array.isArray(b.logs) && b.logs.length > 0) {
-          activeReportLogText = b.logs.join('\n');
+          activeReportLogText = b.logs.join('\\n');
           consoleEl.innerHTML = b.logs.map(l => {
             const cls = l.includes('BUILD_ERROR') ? 'log-err' : (l.includes('BUILD_DONE') ? 'log-ok' : 'log-dim');
             return '<div class="' + cls + '">' + escapeHtml(l) + '</div>';
@@ -1746,6 +1750,77 @@ export function renderApksView({ builds = [] } = {}) {
       if (!activeReportLogText) return;
       navigator.clipboard.writeText(activeReportLogText);
       alert('Console log berhasil disalin ke clipboard!');
+    }
+
+    async function loadApksList() {
+      const container = document.getElementById('apksTableContainer');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/apks');
+        const d = await res.json();
+        const apks = d.apks || [];
+        if (apks.length === 0) {
+          container.innerHTML = '<div style="color:var(--text-muted);padding:36px 0;text-align:center">' +
+            '<div style="font-size:32px;margin-bottom:8px">📦</div>' +
+            '<div style="font-weight:600;font-size:14px;color:#fff;margin-bottom:4px">Belum Ada APK Tersedia di VPS</div>' +
+            '<div style="font-size:12px">Klik tombol <b>▶ Build Staging</b> di atas untuk mengompilasi APK secara lokal di laptop.</div>' +
+          '</div>';
+          return;
+        }
+
+        const rows = apks.map(apk => {
+          const sz = apk.size ? (apk.size > 1024*1024 ? (apk.size/1024/1024).toFixed(1)+' MB' : (apk.size/1024).toFixed(0)+' KB') : '-';
+          const time = apk.time ? new Date(apk.time).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+          return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+            '<td style="padding:12px 14px;font-family:monospace;font-weight:700;color:#fff">' + apk.name + '</td>' +
+            '<td style="padding:12px 14px"><span class="jenkins-badge blue">v' + (apk.version || 'preview') + '</span></td>' +
+            '<td style="padding:12px 14px;font-family:monospace;font-size:12px">' + sz + '</td>' +
+            '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + time + '</td>' +
+            '<td style="padding:12px 14px;text-align:right">' +
+              '<div style="display:flex;gap:6px;justify-content:flex-end">' +
+                '<a href="/apks/' + encodeURIComponent(apk.file) + '" class="btn btn-secondary btn-sm" download style="padding:3px 8px;font-size:11px">⬇️ Unduh</a>' +
+                '<button class="btn btn-primary btn-sm btn-install-apk" data-apk-file="' + encodeURIComponent(apk.file) + '" style="padding:3px 8px;font-size:11px">📲 Install</button>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
+        container.innerHTML = '<div style="overflow-x:auto">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left">' +
+            '<thead>' +
+              '<tr style="border-bottom:1px solid var(--border);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">' +
+                '<th style="padding:10px 14px">Nama File</th>' +
+                '<th style="padding:10px 14px">Versi</th>' +
+                '<th style="padding:10px 14px">Ukuran</th>' +
+                '<th style="padding:10px 14px">Waktu Build</th>' +
+                '<th style="padding:10px 14px;text-align:right">Aksi</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>';
+
+        container.querySelectorAll('.btn-install-apk').forEach(el => {
+          el.addEventListener('click', () => installApkToEmulator(el.dataset.apkFile));
+        });
+      } catch (e) {
+        container.innerHTML = '<p style="color:#f87171;padding:20px 0;text-align:center">Gagal memuat APK: ' + e.message + '</p>';
+      }
+    }
+
+    async function installApkToEmulator(file) {
+      if (!confirm('Install APK ' + decodeURIComponent(file) + ' ke emulator?')) return;
+      try {
+        const res = await fetch('/api/apks/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: decodeURIComponent(file) })
+        });
+        const d = await res.json();
+        alert(d.message || (d.ok ? 'Sukses terinstall!' : 'Gagal: ' + d.error));
+      } catch (e) {
+        alert('Gagal install: ' + e.message);
+      }
     }
 
     function escapeHtml(str) {
