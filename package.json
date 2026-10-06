@@ -22,6 +22,7 @@
     "electron": "electron .",
     "start": "npm run dev:electron",
     "server": "node server/index.js",
+    "runner": "node server/laptop-runner.js",
     "install-hooks": "bash hooks/install-hooks.sh"
   },
   "dependencies": {
