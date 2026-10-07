@@ -29,6 +29,31 @@ if (-not $ProjectDir) {
     }
 }
 
+# 1b. Shorten Windows path via subst B: untuk mem-bypass batasan MAX_PATH (260 char) & CMake (250 char)
+# Mencegah error 'manifest build.ninja still dirty after 100 tries'
+$SubstDrive = "B:"
+$script:UsedSubst = $false
+function script:Cleanup-BuildEnv {
+    if ($script:UsedSubst) {
+        Set-Location "D:\VPS\gaia-office"
+        & subst $SubstDrive /D 2>$null
+    }
+}
+
+if ($ProjectDir.Length -gt 25 -and (-not $ProjectDir.StartsWith($SubstDrive))) {
+    try {
+        & subst $SubstDrive /D 2>$null
+        & subst $SubstDrive "$ProjectDir"
+        if (Test-Path "$SubstDrive\package.json") {
+            Write-BuildLog "BUILD_LOG" "Menggunakan virtual drive $SubstDrive untuk memotong panjang path Windows (MAX_PATH / Ninja bypass)"
+            $ProjectDir = "$SubstDrive\"
+            $script:UsedSubst = $true
+        }
+    } catch {
+        Write-BuildLog "BUILD_WARN" "Gagal mapping virtual drive $SubstDrive, melanjutkan dengan path asli."
+    }
+}
+
 Write-BuildLog "BUILD_LOG" "Project directory: $ProjectDir"
 Write-BuildLog "BUILD_LOG" "Memulai local build dengan profile: $Profile"
 
@@ -53,12 +78,20 @@ if (-not $SkipBuild) {
 
     if (Test-Path "$ProjectDir\android\gradlew.bat") {
         Write-BuildLog "BUILD_LOG" "Membersihkan cache C++ (.cxx) lama agar tidak terjadi loop dirty build.ninja..."
-        Remove-Item -Recurse -Force "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx" -ErrorAction SilentlyContinue
-        Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\.cxx", "$ProjectDir\node_modules\react-native-screens\android\.cxx", "$ProjectDir\node_modules\react-native-gesture-handler\android\.cxx", "$ProjectDir\node_modules\react-native-worklets\android\.cxx", "$ProjectDir\node_modules\expo-modules-core\android\.cxx", "$ProjectDir\node_modules\expo-updates\android\.cxx" -ErrorAction SilentlyContinue
-        Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\build", "$ProjectDir\node_modules\react-native-screens\android\build" -ErrorAction SilentlyContinue
-
-        # Gunakan direktori cache build terisolasi (.gradle_build) agar tidak berbenturan lock dengan IDE / Java Language Server
-        Remove-Item -Recurse -Force "$ProjectDir\android\.gradle_build" -ErrorAction SilentlyContinue
+        $cxxDirs = @(
+            "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx",
+            "$ProjectDir\node_modules\react-native-reanimated\android\.cxx",
+            "$ProjectDir\node_modules\react-native-screens\android\.cxx",
+            "$ProjectDir\node_modules\react-native-gesture-handler\android\.cxx",
+            "$ProjectDir\node_modules\react-native-worklets\android\.cxx",
+            "$ProjectDir\node_modules\expo-modules-core\android\.cxx",
+            "$ProjectDir\node_modules\expo-updates\android\.cxx",
+            "$OriginalProjectDir\node_modules\react-native-reanimated\android\.cxx",
+            "$ProjectDir\android\.gradle_build"
+        )
+        foreach ($d in $cxxDirs) {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue }
+        }
 
         Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease (isolated cache)..."
         Push-Location "$ProjectDir\android"
@@ -90,6 +123,7 @@ if (-not $SkipBuild) {
             Write-BuildLog "BUILD_DONE" "APK berhasil dikompilasi: $destName"
         } elseif ($buildExit -ne 0) {
             Write-BuildLog "BUILD_ERROR" "Kompilasi gagal (exit $buildExit)."
+            Cleanup-BuildEnv
             exit 1
         }
     }
@@ -101,6 +135,7 @@ if (-not $apkFile) {
         $apkFile = $apkCandidate
     } else {
         Write-BuildLog "BUILD_ERROR" "Tidak ditemukan file APK di $ApkOutput"
+        Cleanup-BuildEnv
         exit 1
     }
 }
@@ -182,4 +217,5 @@ if ($AutoInstall) {
     Write-BuildLog "BUILD_INSTALLED" "APK terinstall dan aplikasi diluncurkan di emulator!"
 }
 
+Cleanup-BuildEnv
 Write-BuildLog "PIPELINE_COMPLETE" "Pipeline selesai 100%! APK tersedia di GAIA Office."
