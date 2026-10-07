@@ -93,7 +93,6 @@ if (-not $SkipBuild) {
             exit 1
         }
     }
-}
 
 # 5. Cari APK terbaru di folder output jika belum diset
 if (-not $apkFile) {
