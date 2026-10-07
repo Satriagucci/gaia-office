@@ -62,6 +62,8 @@ if (-not $SkipBuild) {
         if (Test-Path "$ProjectDir\android\gradlew.bat") {
             Write-BuildLog "BUILD_LOG" "Membersihkan cache C++ (.cxx) lama agar tidak terjadi loop dirty build.ninja..."
             Remove-Item -Recurse -Force "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx" -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\.cxx", "$ProjectDir\node_modules\react-native-screens\android\.cxx", "$ProjectDir\node_modules\react-native-gesture-handler\android\.cxx", "$ProjectDir\node_modules\react-native-worklets\android\.cxx", "$ProjectDir\node_modules\expo-modules-core\android\.cxx", "$ProjectDir\node_modules\expo-updates\android\.cxx" -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\build", "$ProjectDir\node_modules\react-native-screens\android\build" -ErrorAction SilentlyContinue
             Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease..."
             Push-Location "$ProjectDir\android"
             .\gradlew.bat assembleRelease 2>&1 | ForEach-Object {
