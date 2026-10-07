@@ -43,35 +43,31 @@ if (-not $SkipBuild) {
     # 3. Pindah ke project
     Set-Location $ProjectDir
 
-    # 4. Local build via EAS (Docker, tidak kena kuota 15/bulan)
-    Write-BuildLog "BUILD_LOG" "Jalankan: eas build --local --profile $Profile --platform android --output $ApkOutput"
-    eas build --local --profile $Profile --platform android --output $ApkOutput 2>&1 | ForEach-Object {
-        Write-BuildLog "BUILD_RAW" $_
+    # 4. Native Expo Gradle Pipeline (Direct, 0 EAS wait, isolated cache)
+    if (-not (Test-Path "$ProjectDir\android")) {
+        Write-BuildLog "BUILD_LOG" "Menjalankan npx expo prebuild --platform android..."
+        npx -y expo prebuild --platform android 2>&1 | ForEach-Object {
+            Write-BuildLog "BUILD_RAW" $_
+        }
     }
 
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        Write-BuildLog "BUILD_WARN" "EAS local butuh platform Linux/Docker, beralih ke Native Expo Gradle Pipeline..."
-        if (-not (Test-Path "$ProjectDir\android")) {
-            Write-BuildLog "BUILD_LOG" "Menjalankan npx expo prebuild --platform android..."
-            npx -y expo prebuild --platform android 2>&1 | ForEach-Object {
-                Write-BuildLog "BUILD_RAW" $_
-            }
-        }
+    if (Test-Path "$ProjectDir\android\gradlew.bat") {
+        Write-BuildLog "BUILD_LOG" "Membersihkan cache C++ (.cxx) lama agar tidak terjadi loop dirty build.ninja..."
+        Remove-Item -Recurse -Force "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\.cxx", "$ProjectDir\node_modules\react-native-screens\android\.cxx", "$ProjectDir\node_modules\react-native-gesture-handler\android\.cxx", "$ProjectDir\node_modules\react-native-worklets\android\.cxx", "$ProjectDir\node_modules\expo-modules-core\android\.cxx", "$ProjectDir\node_modules\expo-updates\android\.cxx" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\build", "$ProjectDir\node_modules\react-native-screens\android\build" -ErrorAction SilentlyContinue
 
-        if (Test-Path "$ProjectDir\android\gradlew.bat") {
-            Write-BuildLog "BUILD_LOG" "Membersihkan cache C++ (.cxx) lama agar tidak terjadi loop dirty build.ninja..."
-            Remove-Item -Recurse -Force "$ProjectDir\android\.cxx", "$ProjectDir\android\app\.cxx" -ErrorAction SilentlyContinue
-            Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\.cxx", "$ProjectDir\node_modules\react-native-screens\android\.cxx", "$ProjectDir\node_modules\react-native-gesture-handler\android\.cxx", "$ProjectDir\node_modules\react-native-worklets\android\.cxx", "$ProjectDir\node_modules\expo-modules-core\android\.cxx", "$ProjectDir\node_modules\expo-updates\android\.cxx" -ErrorAction SilentlyContinue
-            Remove-Item -Recurse -Force "$ProjectDir\node_modules\react-native-reanimated\android\build", "$ProjectDir\node_modules\react-native-screens\android\build" -ErrorAction SilentlyContinue
-            Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease..."
-            Push-Location "$ProjectDir\android"
-            .\gradlew.bat assembleRelease 2>&1 | ForEach-Object {
-                Write-BuildLog "BUILD_RAW" $_
-            }
-            $buildExit = $LASTEXITCODE
-            Pop-Location
-        } else {
+        # Gunakan direktori cache build terisolasi (.gradle_build) agar tidak berbenturan lock dengan IDE / Java Language Server
+        Remove-Item -Recurse -Force "$ProjectDir\android\.gradle_build" -ErrorAction SilentlyContinue
+
+        Write-BuildLog "BUILD_LOG" "Kompilasi APK via Gradle assembleRelease (isolated cache)..."
+        Push-Location "$ProjectDir\android"
+        .\gradlew.bat assembleRelease --project-cache-dir "$ProjectDir\android\.gradle_build" 2>&1 | ForEach-Object {
+            Write-BuildLog "BUILD_RAW" $_
+        }
+        $buildExit = $LASTEXITCODE
+        Pop-Location
+    } else {
             Write-BuildLog "BUILD_LOG" "Menjalankan npx expo run:android --variant release..."
             npx -y expo run:android --variant release 2>&1 | ForEach-Object {
                 Write-BuildLog "BUILD_RAW" $_
