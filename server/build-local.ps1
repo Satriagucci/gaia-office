@@ -29,31 +29,6 @@ if (-not $ProjectDir) {
     }
 }
 
-# 1b. Shorten Windows path via subst B: untuk mem-bypass batasan MAX_PATH (260 char) & CMake (250 char)
-# Mencegah error 'manifest build.ninja still dirty after 100 tries'
-$SubstDrive = "B:"
-$script:UsedSubst = $false
-function script:Cleanup-BuildEnv {
-    if ($script:UsedSubst) {
-        Set-Location "D:\VPS\gaia-office"
-        & subst $SubstDrive /D 2>$null
-    }
-}
-
-if ($ProjectDir.Length -gt 25 -and (-not $ProjectDir.StartsWith($SubstDrive))) {
-    try {
-        & subst $SubstDrive /D 2>$null
-        & subst $SubstDrive "$ProjectDir"
-        if (Test-Path "$SubstDrive\package.json") {
-            Write-BuildLog "BUILD_LOG" "Menggunakan virtual drive $SubstDrive untuk memotong panjang path Windows (MAX_PATH / Ninja bypass)"
-            $ProjectDir = "$SubstDrive\"
-            $script:UsedSubst = $true
-        }
-    } catch {
-        Write-BuildLog "BUILD_WARN" "Gagal mapping virtual drive $SubstDrive, melanjutkan dengan path asli."
-    }
-}
-
 Write-BuildLog "BUILD_LOG" "Project directory: $ProjectDir"
 Write-BuildLog "BUILD_LOG" "Memulai local build dengan profile: $Profile"
 
@@ -123,7 +98,6 @@ if (-not $SkipBuild) {
             Write-BuildLog "BUILD_DONE" "APK berhasil dikompilasi: $destName"
         } elseif ($buildExit -ne 0) {
             Write-BuildLog "BUILD_ERROR" "Kompilasi gagal (exit $buildExit)."
-            Cleanup-BuildEnv
             exit 1
         }
     }
@@ -135,7 +109,6 @@ if (-not $apkFile) {
         $apkFile = $apkCandidate
     } else {
         Write-BuildLog "BUILD_ERROR" "Tidak ditemukan file APK di $ApkOutput"
-        Cleanup-BuildEnv
         exit 1
     }
 }
@@ -217,5 +190,4 @@ if ($AutoInstall) {
     Write-BuildLog "BUILD_INSTALLED" "APK terinstall dan aplikasi diluncurkan di emulator!"
 }
 
-Cleanup-BuildEnv
 Write-BuildLog "PIPELINE_COMPLETE" "Pipeline selesai 100%! APK tersedia di GAIA Office."
