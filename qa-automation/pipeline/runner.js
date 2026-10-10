@@ -47,7 +47,12 @@ export async function runQaPipeline(targetScenario = 'all', callbacks = {}, cust
   const isAll = targetScenario === 'all' || targetScenario === 'all-scenarios'
   const scenarioKeys = isAll
     ? Object.keys(scenariosMap)
-    : Object.keys(scenariosMap).filter(k => k === targetScenario || targetScenario.includes(k))
+    : Object.keys(scenariosMap).filter(k => 
+        k === targetScenario || 
+        targetScenario.includes(k) || 
+        k.includes(targetScenario) ||
+        (/^\d\d/.test(targetScenario) && k.startsWith(targetScenario.slice(0, 2)))
+      )
 
   if (scenarioKeys.length === 0) {
     throw new Error(`Skenario '${targetScenario}' tidak ditemukan di qa-automation/scenarios! Tersedia: ${Object.keys(scenariosMap).join(', ')}`)
