@@ -2127,10 +2127,64 @@ export function renderTestBankView({ scenarios = [] }) {
 // ─────────────────────────────────────────────────────────────
 // SCENARIO DETAIL VIEW (GET /screenshots/:scenario)
 // ─────────────────────────────────────────────────────────────
-export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = '', status = 'pending', runner = null }) {
+export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = '', status = 'pending', runner = null, runs = [], testScript = '' }) {
   const statusColor = status === 'pass' ? '#10b981' : status === 'fail' ? '#ef4444' : '#f59e0b';
   const statusIcon = status === 'pass' ? '✅ PASS' : status === 'fail' ? '❌ FAIL' : '⏳ PENDING';
 
+  const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // Run history list
+  const runsList = Array.isArray(runs) ? runs : [];
+  const hasRuns = runsList.length > 0;
+
+  // Build HTML for each run's step cards
+  const runsPanelsHtml = runsList.map((r, rIdx) => {
+    const isFirst = rIdx === 0;
+    const rStatusColor = r.status === 'pass' ? '#10b981' : r.status === 'fail' ? '#ef4444' : '#f59e0b';
+    const rStatusText = r.status === 'pass' ? '✓ PASS' : r.status === 'fail' ? '✗ FAIL' : '⏳ RUNNING';
+    const steps = r.steps || [];
+
+    const stepsCards = steps.length > 0 ? steps.map(s => {
+      const sColor = s.status === 'pass' ? '#10b981' : '#ef4444';
+      const durText = s.duration ? `⏱️ ${s.duration}s` : 'OK';
+      return `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:all 0.2s">
+          <div style="padding:10px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;font-weight:700;color:#fff">Step ${s.stepIndex}/${s.total || steps.length}: ${s.name}</span>
+            <span style="font-size:11px;font-weight:700;color:${sColor};background:${sColor}18;padding:2px 8px;border-radius:6px;border:1px solid ${sColor}30">${s.status.toUpperCase()} • ${durText}</span>
+          </div>
+          <div style="cursor:zoom-in;background:#030712;display:flex;align-items:center;justify-content:center" onclick="openZoomModal('/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(s.filename)}')">
+            <img src="/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(s.filename)}" loading="lazy" style="width:100%;aspect-ratio:411/731;object-fit:cover;display:block">
+          </div>
+          <div style="padding:8px 12px;font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between">
+            <span>${s.filename}</span>
+            <span>${s.time ? s.time.slice(11, 19) : ''}</span>
+          </div>
+        </div>
+      `;
+    }).join('') : `
+      <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">
+        Belum ada step screenshot tersimpan pada sesi ini.
+      </div>
+    `;
+
+    return `
+      <div class="run-history-panel" id="run-panel-${r.runId || rIdx}" style="display:${isFirst ? 'flex' : 'none'};flex-direction:column;gap:14px">
+        <div style="padding:10px 14px;background:${rStatusColor}12;border:1px solid ${rStatusColor}30;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:#fff">${r.runId || 'Run #' + (runsList.length - rIdx)} • <span style="color:${rStatusColor}">${rStatusText}</span></div>
+            <div style="font-size:11px;color:var(--text-muted)">Waktu: ${r.timeStr || r.timestamp || '-'} • Total Steps: ${steps.length}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="runScenarioQuick('${scenario}', event)">↻ Re-run Skenario</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:14px">
+          ${stepsCards}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Fallback raw capture cards
   const captureCardsHtml = caps.filter(f => f.name !== 'latest.png').map(f => {
     const t = f.name.replace('.png','').replace(/[-]/g,':').replace(':','-',1);
     const sizeStr = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB';
@@ -2143,13 +2197,13 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
           <span>${t}</span>
           <span>${sizeStr}</span>
         </div>
-        <button onclick="deleteSingleCapture('${encodeURIComponent(scenario)}', '${encodeURIComponent(f.name)}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.65);border:none;color:#fff;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='#ef4444'" onmouseout="this.style.background='rgba(0,0,0,0.65)'" title="Hapus screenshot">✕</button>
+        <button onclick="deleteSingleCapture('${encodeURIComponent(scenario)}', '${encodeURIComponent(f.name)}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.65);border:none;color:#fff;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:background 0.2s" title="Hapus screenshot">✕</button>
       </div>
     `;
   }).join('');
 
   const body = `
-  <div class="container">
+  <div class="container" style="max-width:1200px">
     <!-- Header -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -2158,14 +2212,14 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
         <span style="font-size:12px;font-weight:700;color:${statusColor};background:${statusColor}18;padding:4px 10px;border-radius:8px;border:1px solid ${statusColor}35">
           ${statusIcon}
         </span>
-        <span style="font-size:13px;color:var(--text-muted)">${caps.length} captures</span>
+        <span style="font-size:13px;color:var(--text-muted)">${hasRuns ? runsList.length + ' runs tercatat' : caps.length + ' captures'}</span>
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-success btn-sm" onclick="runScenarioQuick('${scenario}', event)" id="btnRunEngine" style="font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(16,185,129,0.3)">
+        <button class="btn btn-success btn-sm" onclick="runScenarioQuick('${scenario}', event)" style="font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(16,185,129,0.3)">
           ▶ Run Kepingan Ini
         </button>
-        <button class="btn btn-primary btn-sm" onclick="runAutomation('laptop')" id="btnRunLaptop">
+        <button class="btn btn-primary btn-sm" onclick="runScenarioQuick('${scenario}', event)">
           📱 Run di Mobile Emulator
         </button>
         <a href="/capture?scenario=${encodeURIComponent(scenario)}&target=laptop" class="btn btn-secondary btn-sm" title="Capture dari Emulator Laptop">
@@ -2177,88 +2231,80 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       </div>
     </div>
 
-    <!-- Jenkins Test Automation Pipeline Card -->
-    <div id="runnerPanel" class="jenkins-pipeline-card" style="margin-bottom:24px;display:none">
-      <div class="jenkins-header">
-        <div class="jenkins-title-group">
-          <span class="jenkins-weather" id="jenkinsTestWeather">☀️</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <h2 style="font-size:17px;font-weight:800;color:#fff">Pipeline: ${scenario}</h2>
-              <span class="jenkins-badge blue" id="jenkinsTestBadge">#QUEUED</span>
-            </div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
-              Target: <span style="color:#38bdf8" id="jenkinsTestTarget">Laptop ADB Emulator</span> • Scenario: <b>${scenario}</b>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="jenkins-timer" id="jenkinsTestTimer">⏱️ 00:00</div>
-          <button class="btn btn-danger btn-sm" onclick="stopAutomation()" id="btnStopRun" style="display:none">
-            ⏹ Batalkan Pipeline
+    <!-- Layout: 2 Columns (Script on Left, Runs & Captures on Right) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+      
+      <!-- Script & Documentation Card -->
+      <div class="card" style="padding:18px">
+        <!-- Tabs Header -->
+        <div style="display:flex;gap:8px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px">
+          <button id="tabBtnCode" class="btn btn-primary btn-sm" onclick="switchScriptTab('code')" style="font-weight:700;border-radius:8px">
+            🧪 QA Automation Script (JavaScript SOM)
+          </button>
+          <button id="tabBtnDoc" class="btn btn-secondary btn-sm" onclick="switchScriptTab('doc')" style="border-radius:8px">
+            📋 Catatan Skenario (Markdown)
           </button>
         </div>
-      </div>
 
-      <!-- Dynamic Stage View for Test Steps -->
-      <div class="jenkins-stages" id="jenkinsTestStages"></div>
-
-      <!-- Jenkins Striped Animated Progress Bar -->
-      <div class="jenkins-bar-container">
-        <div class="jenkins-bar-track">
-          <div class="jenkins-bar-fill" id="progressBar"></div>
-        </div>
-        <div class="jenkins-bar-labels">
-          <span class="jenkins-bar-status-text" id="runStatusText">⏳ Memulai test automation...</span>
-          <span class="jenkins-bar-pct" id="progressPctText">0%</span>
-        </div>
-      </div>
-
-      <!-- Jenkins Step Execution Console -->
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Console Output & Telemetry</span>
-          <span id="progressShotCount" style="font-size:11px;color:var(--text-muted)">0 screenshots tersimpan</span>
-        </div>
-        <div id="stepLogContainer" class="terminal-box" style="margin-bottom:12px;max-height:220px"></div>
-      </div>
-    </div>
-
-    <!-- Layout: 2 Columns (Script on Left, Captures on Right) -->
-    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start">
-      
-      <!-- Script Editor -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>📋</span> Scenario Test Script (Markdown)
+        <!-- Tab 1: QA Automation Code -->
+        <div id="tabContentCode">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text-muted)">Berkas: <code style="color:#38bdf8">qa-automation/scenarios/${scenario}.test.js</code></span>
+            <span class="jenkins-badge green" style="font-size:11px">Plug & Play SOM</span>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span id="saveStatus" style="font-size:12px;color:#10b981;opacity:0;transition:opacity 0.25s">✓ Tersimpan</span>
-            <button onclick="saveScriptDirect()" class="btn btn-primary btn-sm">💾 Simpan</button>
-          </div>
+          <pre style="background:#030712;border:1px solid var(--border);border-radius:10px;padding:14px;max-height:560px;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:#cbd5e1;line-height:1.6;white-space:pre-wrap"><code>${escapeHtml(testScript || '// File skenario otomatisasi: qa-automation/scenarios/' + scenario + '.test.js\n// Menggunakan Screen Object Model')}</code></pre>
         </div>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-          Tuliskan langkah-langkah di bawah heading <code>## Steps</code> (contoh: <code>1. Buka halaman</code>). Runner akan mengeksekusi step tersebut secara berurutan.
-        </p>
-        <textarea id="editorArea" style="width:100%;min-height:420px;background:#030712;color:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none">${md || ''}</textarea>
+
+        <!-- Tab 2: Markdown Scenario Doc -->
+        <div id="tabContentDoc" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text-muted)">Deskripsi & spesifikasi expected result</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="saveStatus" style="font-size:12px;color:#10b981;opacity:0;transition:opacity 0.25s">✓ Tersimpan</span>
+              <button onclick="saveScriptDirect()" class="btn btn-primary btn-sm">💾 Simpan</button>
+            </div>
+          </div>
+          <textarea id="editorArea" style="width:100%;min-height:500px;background:#030712;color:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none">${md || ''}</textarea>
+        </div>
       </div>
 
-      <!-- Screenshot Gallery -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>📸</span> Screenshots & Artifacts
+      <!-- Validated Captures & Run History Card -->
+      <div class="card" style="padding:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="margin:0;font-size:15px;font-weight:700">
+            <span>📸</span> Validasi Layar & Riwayat Run
           </div>
-          <a href="/capture?scenario=${encodeURIComponent(scenario)}&target=laptop" class="btn btn-secondary btn-sm">+ Ambil Foto</a>
+          <a href="/capture?scenario=${encodeURIComponent(scenario)}&target=laptop" class="btn btn-secondary btn-sm">+ Ambil Foto Layar</a>
         </div>
-        
-        ${caps.length === 0 ? '<p style="color:var(--text-muted);padding:40px 0;text-align:center;font-size:13px">Belum ada screenshot. Klik tombol di atas untuk mengambil layar emulator.</p>' : `
-          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:12px">
+
+        ${hasRuns ? `
+          <!-- Run Session Selector -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;background:rgba(255,255,255,0.02);padding:10px 14px;border-radius:8px;border:1px solid var(--border)">
+            <label for="runHistorySelect" style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap">Pilih Sesi Pengujian:</label>
+            <select id="runHistorySelect" onchange="switchRunView(this.value)" style="flex:1;background:#0b1120;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:7px;font-size:12px;outline:none">
+              ${runsList.map((r, idx) => {
+                const rStatus = r.status === 'pass' ? '✅ PASS' : r.status === 'fail' ? '❌ FAIL' : '⏳ RUNNING';
+                const rTime = r.timeStr || (r.timestamp ? r.timestamp.slice(0, 16).replace('T', ' ') : `Run #${idx + 1}`);
+                return `<option value="${r.runId || idx}">Run #${runsList.length - idx} • ${rTime} [${rStatus}] (${r.steps?.length || 0} Steps)</option>`;
+              }).join('')}
+            </select>
+          </div>
+
+          <!-- Run Panels Container -->
+          <div id="runsPanelsContainer">
+            ${runsPanelsHtml}
+          </div>
+        ` : (caps.length > 0 ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:12px">
             ${captureCardsHtml}
           </div>
-        `}
+        ` : `
+          <div style="text-align:center;padding:50px 20px;color:var(--text-muted)">
+            <div style="font-size:36px;margin-bottom:8px">🧪</div>
+            <p style="font-size:13px;margin-bottom:14px">Belum ada hasil eksekusi pengujian untuk skenario ini.</p>
+            <button class="btn btn-success btn-sm" onclick="runScenarioQuick('${scenario}', event)">▶ Jalankan Pengujian Sekarang</button>
+          </div>
+        `)}
       </div>
 
     </div>
@@ -2277,7 +2323,7 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
           <span style="font-size:22px">⚡</span>
           <div>
             <h2 id="modalRunTitle" style="font-size:18px;font-weight:800;margin:0;color:#fff">Menjalankan Pengujian...</h2>
-            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Live Test Bank Engine & Staging API</div>
+            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Live Emulator ADB Pipeline Runner</div>
           </div>
         </div>
         <span id="modalRunBadge" class="jenkins-badge yellow" style="font-size:12px;padding:4px 10px">#RUNNING</span>
@@ -2288,7 +2334,7 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       </div>
 
       <div id="modalLogBox" style="background:#030712;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;height:280px;overflow-y:auto;color:#cbd5e1;line-height:1.6">
-        <div style="color:#64748b">Inisialisasi Test Engine & API Staging...</div>
+        <div style="color:#64748b">Menghubungkan ke Android Emulator via Runner...</div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
@@ -2311,7 +2357,34 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       modal.classList.add('active');
     }
 
-    // Auto-save script
+    function switchScriptTab(tab) {
+      const btnCode = document.getElementById('tabBtnCode');
+      const btnDoc = document.getElementById('tabBtnDoc');
+      const contentCode = document.getElementById('tabContentCode');
+      const contentDoc = document.getElementById('tabContentDoc');
+
+      if (tab === 'code') {
+        btnCode.className = 'btn btn-primary btn-sm';
+        btnDoc.className = 'btn btn-secondary btn-sm';
+        contentCode.style.display = 'block';
+        contentDoc.style.display = 'none';
+      } else {
+        btnCode.className = 'btn btn-secondary btn-sm';
+        btnDoc.className = 'btn btn-primary btn-sm';
+        contentCode.style.display = 'none';
+        contentDoc.style.display = 'block';
+      }
+    }
+
+    function switchRunView(runId) {
+      document.querySelectorAll('.run-history-panel').forEach(el => {
+        el.style.display = 'none';
+      });
+      const target = document.getElementById('run-panel-' + runId);
+      if (target) target.style.display = 'flex';
+    }
+
+    // Auto-save markdown script
     let saveTimeout = null;
     const editor = document.getElementById('editorArea');
     if (editor) {
@@ -2336,193 +2409,10 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       }
     }
 
-    // Automation Runner via SSE
-    let runEventSource = null;
-    let isRunning = false;
-
-    function runAutomation(target = 'laptop') {
-      if (isRunning) return;
-      isRunning = true;
-
-      const pnl = document.getElementById('runnerPanel');
-      const pBar = document.getElementById('progressBar');
-      const sText = document.getElementById('runStatusText');
-      const logBox = document.getElementById('stepLogContainer');
-      const btnStop = document.getElementById('btnStopRun');
-      const bLaptop = document.getElementById('btnRunLaptop');
-      const bVps = document.getElementById('btnRunVps');
-      const pctText = document.getElementById('progressPctText');
-      const badge = document.getElementById('jenkinsTestBadge');
-      const weather = document.getElementById('jenkinsTestWeather');
-      const timerEl = document.getElementById('jenkinsTestTimer');
-
-      pnl.style.display = 'block';
-      pBar.style.width = '0%';
-      pBar.className = 'jenkins-bar-fill';
-      pctText.textContent = '0%';
-      sText.textContent = '⏳ Menginisialisasi runner di ' + target + '...';
-      sText.style.color = '#38bdf8';
-      logBox.innerHTML = '<div class="log-dim">[' + new Date().toLocaleTimeString() + '] Menyiapkan ADB test runner di ' + target + '...</div>';
-      if (btnStop) btnStop.style.display = 'inline-flex';
-      if (bLaptop) bLaptop.disabled = true;
-      if (bVps) bVps.disabled = true;
-
-      badge.className = 'jenkins-badge blue';
-      badge.textContent = '#RUNNING';
-      weather.textContent = '⛅';
-
-      // Stopwatch Timer
-      testStartTime = Date.now();
-      if (testTimerInterval) clearInterval(testTimerInterval);
-      testTimerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - testStartTime) / 1000);
-        const m = Math.floor(sec / 60).toString().padStart(2, '0');
-        const s = (sec % 60).toString().padStart(2, '0');
-        timerEl.textContent = '⏱️ ' + m + ':' + s;
-      }, 1000);
-
-      // Parse Steps from script editor to populate Jenkins Stages
-      const mdText = document.getElementById('editorArea')?.value || '';
-      const stepMatches = mdText.match(/## Steps[\r\n]+([\s\S]*?)(?:[\r\n]+## |$)/);
-      const stepLines = stepMatches ? stepMatches[1].trim().split('\n').filter(l => /^\d+\./.test(l.trim())) : [];
-      const stagesContainer = document.getElementById('jenkinsTestStages');
-      stagesContainer.innerHTML = '';
-
-      const stagesList = [
-        { id: 'tstage-setup', name: 'Device Init' },
-        ...stepLines.map((l, idx) => ({ id: 'tstage-step-' + (idx + 1), name: l.replace(/^\d+\.\s*/, '').slice(0, 16) })),
-        { id: 'tstage-report', name: 'Quality Gate' }
-      ];
-
-      stagesList.forEach((st, idx) => {
-        const box = document.createElement('div');
-        box.id = st.id;
-        box.className = 'jenkins-stage-box ' + (idx === 0 ? 'running' : 'pending');
-        box.innerHTML = '<div class="jenkins-stage-icon">' + (idx === 0 ? '⚡' : (idx + 1)) + '</div>' +
-          '<div class="jenkins-stage-title" title="' + st.name + '">' + st.name + '</div>' +
-          '<div class="jenkins-stage-duration" id="' + st.id + '-time">-</div>';
-        stagesContainer.appendChild(box);
-      });
-
-      function setTestStage(stageId, state, durationText) {
-        const box = document.getElementById(stageId);
-        if (!box) return;
-        box.className = 'jenkins-stage-box ' + state;
-        const icon = box.querySelector('.jenkins-stage-icon');
-        if (icon) {
-          if (state === 'running') icon.textContent = '⚡';
-          else if (state === 'success') icon.textContent = '✓';
-          else if (state === 'failed') icon.textContent = '✕';
-        }
-        if (durationText) {
-          const dEl = document.getElementById(stageId + '-time');
-          if (dEl) dEl.textContent = durationText;
-        }
-      }
-
-      if (runEventSource) runEventSource.close();
-      runEventSource = new EventSource('/screenshots/${encodeURIComponent(scenario)}/run?target=' + target);
-
-      runEventSource.onmessage = function(e) {
-        try {
-          const d = JSON.parse(e.data);
-          
-          if (d.type === 'progress') {
-            pBar.style.width = d.percent + '%';
-            pctText.textContent = d.percent + '%';
-            sText.textContent = 'Step ' + d.current + ' of ' + d.total + ' (' + d.percent + '%)...';
-            setTestStage('tstage-setup', 'success', '1s');
-            const curStageId = 'tstage-step-' + d.current;
-            setTestStage(curStageId, 'running', '...');
-          }
-          else if (d.type === 'step') {
-            const line = document.createElement('div');
-            line.className = d.status === 'pass' ? 'log-ok' : 'log-err';
-            line.textContent = (d.status === 'pass' ? '✅ ' : '❌ ') + (d.name || 'Step selesai');
-            logBox.appendChild(line);
-            logBox.scrollTop = logBox.scrollHeight;
-
-            const stepNum = d.step || d.current || 1;
-            const curStageId = 'tstage-step-' + stepNum;
-            setTestStage(curStageId, d.status === 'pass' ? 'success' : 'failed', 'ok');
-
-            const nextStageId = 'tstage-step-' + (stepNum + 1);
-            if (document.getElementById(nextStageId)) {
-              setTestStage(nextStageId, 'running', '...');
-            }
-          }
-          else if (d.type === 'info') {
-            const line = document.createElement('div');
-            line.className = 'log-dim';
-            line.textContent = 'ℹ️ ' + d.message;
-            logBox.appendChild(line);
-          }
-          else if (d.type === 'result') {
-            pBar.style.width = '100%';
-            pctText.textContent = '100%';
-            pBar.className = 'jenkins-bar-fill ' + (d.status === 'pass' ? 'success' : 'failed');
-            sText.textContent = (d.status === 'pass' ? '✅ ' : '❌ ') + d.message;
-            sText.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
-            setTestStage('tstage-report', d.status === 'pass' ? 'success' : 'failed', 'done');
-            badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
-            badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
-            weather.textContent = d.status === 'pass' ? '☀️' : '🌧️';
-            finishRun();
-          }
-          else if (d.type === 'error') {
-            pBar.className = 'jenkins-bar-fill failed';
-            sText.textContent = '❌ ' + d.message;
-            sText.style.color = '#ef4444';
-            badge.className = 'jenkins-badge red';
-            badge.textContent = '#FAILED';
-            weather.textContent = '🌧️';
-            finishRun();
-          }
-        } catch {}
-      };
-
-      runEventSource.onerror = function() {
-        sText.textContent = '❌ Koneksi terputus';
-        pBar.className = 'jenkins-bar-fill failed';
-        badge.className = 'jenkins-badge red';
-        badge.textContent = '#FAILED';
-        weather.textContent = '🌧️';
-        finishRun();
-      };
-    }
-
-    let testTimerInterval = null;
-    let testStartTime = 0;
-
-    function finishRun() {
-      isRunning = false;
-      if (testTimerInterval) {
-        clearInterval(testTimerInterval);
-        testTimerInterval = null;
-      }
-      if (runEventSource) {
-        runEventSource.close();
-        runEventSource = null;
-      }
-      const btnStop = document.getElementById('btnStopRun');
-      const bLaptop = document.getElementById('btnRunLaptop');
-      const bVps = document.getElementById('btnRunVps');
-      if (btnStop) btnStop.style.display = 'none';
-      if (bLaptop) bLaptop.disabled = false;
-      if (bVps) bVps.disabled = false;
-    }
-
-    function stopAutomation() {
-      finishRun();
-      document.getElementById('runStatusText').textContent = '⏹ Dibatalkan';
-      const badge = document.getElementById('jenkinsTestBadge');
-      if (badge) { badge.className = 'jenkins-badge red'; badge.textContent = '#ABORTED'; }
-    }
-
     async function deleteSingleCapture(scenario, file) {
       if (!confirm('Hapus screenshot ini?')) return;
       try {
-        const r = await fetch('/screenshots/' + scenario + '/delete-file?file=' + file, {
+        await fetch('/screenshots/' + scenario + '/delete-file?file=' + file, {
           headers: { 'Accept': 'application/json' }
         });
         const card = document.getElementById('cap-card-' + file);
@@ -2548,7 +2438,7 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       document.getElementById('modalRunBadge').className = 'jenkins-badge yellow';
       document.getElementById('modalRunBadge').textContent = '#RUNNING';
       document.getElementById('modalProgressBar').style.width = '15%';
-      document.getElementById('modalLogBox').innerHTML = '<div style="color:#64748b">Menghubungkan ke Test Engine...</div>';
+      document.getElementById('modalLogBox').innerHTML = '<div style="color:#64748b">Menghubungkan ke Android Emulator via Runner...</div>';
       document.getElementById('modalRefreshBtn').style.display = 'none';
       document.getElementById('modalCloseBtn').textContent = 'Batal';
       document.getElementById('testRunModal').classList.add('active');
@@ -2577,36 +2467,39 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       const logBox = document.getElementById('modalLogBox');
       const pBar = document.getElementById('modalProgressBar');
       const badge = document.getElementById('modalRunBadge');
+      let isDone = false;
 
       if (activeTestSSE) activeTestSSE.close();
-      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=engine');
+      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=laptop');
 
       activeTestSSE.onmessage = function(e) {
         try {
           const d = JSON.parse(e.data);
           const line = document.createElement('div');
 
-          if (d.type === 'step') {
+          if (d.type === 'step' || d.type === 'runner_step') {
             line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
-            line.textContent = d.name;
+            const stepName = d.name || d.description || ('Step ' + (d.stepIndex || ''));
+            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + stepName + (d.screenshot ? ' [' + d.screenshot + ']' : '');
             if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'progress') {
-            if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'result') {
+          } else if (d.type === 'progress' || d.type === 'runner_progress') {
+            const pct = d.percent || d.progressPct;
+            if (pct) pBar.style.width = pct + '%';
+          } else if (d.type === 'result' || d.type === 'runner_test_result') {
+            isDone = true;
             clearInterval(testTimer);
             pBar.style.width = '100%';
             badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
             badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
             line.style.fontWeight = 'bold';
             line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
-            line.textContent = '🏁 ' + d.message;
+            line.textContent = '🏁 ' + (d.message || 'Selesai');
             document.getElementById('modalCloseBtn').textContent = 'Tutup';
             document.getElementById('modalRefreshBtn').style.display = 'inline-block';
-            activeTestSSE.close();
-            activeTestSSE = null;
+            if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
           } else {
             line.style.color = '#94a3b8';
-            line.textContent = d.message || JSON.stringify(d);
+            line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
           }
 
           logBox.appendChild(line);
@@ -2617,6 +2510,7 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       };
 
       activeTestSSE.onerror = function() {
+        if (isDone) return;
         clearInterval(testTimer);
         badge.className = 'jenkins-badge red';
         badge.textContent = '#ERROR';

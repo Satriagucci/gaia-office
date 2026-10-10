@@ -37,12 +37,21 @@ export class TestReporter {
         const base64 = readFileSync(tempFile).toString('base64')
         try { unlinkSync(tempFile) } catch {}
 
-        // Upload ke GAIA Office HTTP endpoint
+        // Upload ke GAIA Office HTTP endpoint dengan metadata lengkap
         const uploadUrl = `${TEST_CONFIG.httpUrl}/api/scenarios/${encodeURIComponent(this.scenario)}/upload-capture`
         const res = await fetch(uploadUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, filename: screenshotFilename })
+          body: JSON.stringify({
+            image: base64,
+            filename: screenshotFilename,
+            runId: this.jobId,
+            stepIndex: index,
+            total,
+            name,
+            duration: customDuration,
+            status: 'pass'
+          })
         })
         const d = await res.json()
         uploaded = d?.ok || false

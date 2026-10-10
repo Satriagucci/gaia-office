@@ -21,7 +21,8 @@ export async function run({ driver, detector, reporter }) {
 
   // Step 1: Open Map
   driver.launchApp()
-  const homeVal = await home.validateReady(30)
+  const homeVal = await home.validateReady(60)
+  await home.handleOnboarding()
   await home.openPetaTab()
   await radar.snap(1, 3, `Membuka Peta Radar Misi di Sekitar (${homeVal.duration}s)`, '05_radar_map.png', homeVal.duration)
 

@@ -64,7 +64,7 @@ export async function runQaPipeline(targetScenario = 'all', callbacks = {}, cust
     const scenario = scenariosMap[key]
     const reporter = new TestReporter(driver, {
       scenario: key,
-      jobId: `job-${Date.now()}`,
+      jobId: callbacks.jobId || `job-${Date.now()}`,
       onStep: callbacks.onStep,
       onLog: callbacks.onLog,
       onProgress: callbacks.onProgress,

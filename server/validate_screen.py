@@ -23,7 +23,8 @@ def check_app_focus(device_id):
 
 def analyze_screen(img_path):
     """
-    Returns detected screen type: 'home', 'onboarding_blue', 'onboarding_pink', 'auth_sheet', 'register_form', 'login_form', 'unknown'
+    Returns detected screen type:
+    'home', 'onboarding', 'auth_sheet', 'profile_logged_in', 'logout_dialog', 'register_form', 'login_form', 'unknown'
     """
     try:
         im = Image.open(img_path)
@@ -32,32 +33,61 @@ def analyze_screen(img_path):
     
     w, h = im.size
     
-    # 1. Top bar at (100, 150)
-    p_top = im.getpixel((100, 150))
-    p_bot = im.getpixel((100, 2150))
+    # Sample points (scaled to 1080x2280 basis)
+    def px(x, y):
+        sx = int(x * w / 1080)
+        sy = int(y * h / 2280)
+        return im.getpixel((min(sx, w-1), min(sy, h-1)))
     
-    # Check if Auth Sheet is open (bottom sheet with blue "Daftar dengan Email" button)
-    p_sheet_btn = im.getpixel((540, 1890))
-    if p_sheet_btn[0] < 50 and p_sheet_btn[1] > 130 and p_sheet_btn[2] > 190 and p_top[2] > 90:
+    p_top = px(100, 150)
+    p_bot = px(100, 2150)
+    p_center = px(540, 1140)
+    
+    # 1. Check Logout Confirmation Dialog (ActionableSheet with red "Ya, Keluar" button)
+    p_logout_btn = px(540, 2020)
+    if p_logout_btn[0] > 200 and p_logout_btn[1] < 80 and p_logout_btn[2] < 80:
+        return 'logout_dialog'
+    
+    # 2. Check Auth Sheet (Bottom sheet with blue "Daftar dengan Email" button at 540, 1890)
+    p_sheet_btn = px(540, 1890)
+    if p_sheet_btn[0] < 50 and p_sheet_btn[1] > 120 and p_sheet_btn[2] > 180 and p_top[2] > 60:
         return 'auth_sheet'
-    
-    # Check Register Form: White background at top, title "Buat Akun Baru" or logo
-    p_bg = im.getpixel((540, 100))
-    if p_bg[0] > 240 and p_bg[1] > 240 and p_bg[2] > 240:
-        has_title = any(im.getpixel((x, 495))[0] < 60 for x in range(350, 750, 10))
-        has_logo = any(im.getpixel((x, 220))[2] > 180 and im.getpixel((x, 220))[0] < 100 for x in range(400, 600, 10))
+        
+    # 3. Check Register Form: White header/top, blue logo or title
+    p_bg = px(540, 100)
+    if p_bg[0] > 235 and p_bg[1] > 235 and p_bg[2] > 235:
+        has_title = any(px(x, 495)[0] < 80 for x in range(350, 750, 20))
+        has_logo = any(px(x, 220)[2] > 160 and px(x, 220)[0] < 120 for x in range(400, 600, 20))
         if has_title or has_logo:
             return 'register_form'
 
-    # Check Home Screen: Deep blue header and white bottom navigation
-    if (p_top[2] > 80 and p_top[0] < 50) and (p_bot[0] > 220 and p_bot[1] > 220 and p_bot[2] > 220):
+    # 4. Check Login Form: White background with login elements
+    if p_bg[0] > 235 and p_bg[1] > 235 and p_bg[2] > 235:
+        p_login_btn = px(540, 1450)
+        if p_login_btn[0] < 60 and p_login_btn[1] > 120 and p_login_btn[2] > 180:
+            return 'login_form'
+
+    # 5. Check Onboarding Slides (Top Skip button or carousel)
+    # Blue slide 1
+    if p_top[2] > 170 and p_top[0] < 60 and p_bot[2] > 150:
+        return 'onboarding'
+    # Pink / gradient slides
+    if p_top[0] > 190 and p_top[1] < 130 and p_top[2] > 110:
+        return 'onboarding'
+    # Check "Lewati" text button area at top right (845, 140)
+    p_skip = px(845, 140)
+    if p_skip[0] > 200 and p_skip[1] > 200 and p_skip[2] > 200 and p_bot[0] < 50:
+        return 'onboarding'
+
+    # 6. Check Home Screen: Deep cyan/blue hero header and white bottom navbar
+    if (p_top[2] > 70 and p_top[0] < 60) and (p_bot[0] > 210 and p_bot[1] > 210 and p_bot[2] > 210):
         return 'home'
-    
-    # Check Onboarding Slides
-    if p_top[2] > 180 and p_top[0] < 50:
-        return 'onboarding_blue'
-    if p_top[0] > 200 and p_top[1] < 120 and p_top[2] > 120:
-        return 'onboarding_pink'
+        
+    # 7. Check Profile Screen (when user is already logged in): White/light bg with profile menus
+    if p_top[0] > 220 and p_top[1] > 220 and p_top[2] > 220 and p_bot[0] > 210:
+        # Check if logout button is present near bottom (red icon/text)
+        p_menu = px(100, 1800)
+        return 'profile_logged_in'
 
     return 'unknown'
 
@@ -68,10 +98,13 @@ def main():
         
     device_id = sys.argv[1]
     target_screen = sys.argv[2]
-    timeout_sec = float(sys.argv[3]) if len(sys.argv) > 3 else 25.0
+    # Default 60s for home launching to allow cold-start on slow emulators
+    default_timeout = 60.0 if target_screen == 'home' else 25.0
+    timeout_sec = float(sys.argv[3]) if len(sys.argv) > 3 else default_timeout
     
     tmp_img = os.path.join(os.path.dirname(__file__), f"_val_{device_id}.png")
     start_time = time.time()
+    last_am_start = 0
     
     while time.time() - start_time < timeout_sec:
         elapsed = time.time() - start_time
@@ -79,28 +112,32 @@ def main():
         # 1. Verify app has focus
         is_focused = check_app_focus(device_id)
         if not is_focused:
-            print(f"WAIT|{elapsed:.1f}|Menunggu aplikasi BukainJalan fokus di layar...", flush=True)
-            run_adb(device_id, 'shell', 'am', 'start', '-n', 'com.bukainjalan.app/.MainActivity')
-            time.sleep(1.0)
+            # Rate limit am start: only retry after 12 seconds to prevent killing app init
+            if time.time() - last_am_start > 12.0:
+                print(f"WAIT|{elapsed:.1f}|Meluncurkan aplikasi & menunggu inisialisasi window...", flush=True)
+                run_adb(device_id, 'shell', 'am', 'start', '-n', 'com.bukainjalan.app/.MainActivity')
+                last_am_start = time.time()
+            else:
+                print(f"WAIT|{elapsed:.1f}|Menunggu engine React Native booting di emulator...", flush=True)
+            time.sleep(1.2)
             continue
             
         # 2. Capture and inspect
         capture_screen(device_id, tmp_img)
         detected = analyze_screen(tmp_img)
         
-        # If target is Home, but we hit onboarding, auto skip it
+        # If target is Home, but we hit onboarding, auto handle it
         if target_screen == 'home':
-            if detected == 'onboarding_blue':
-                print(f"WAIT|{elapsed:.1f}|Melewati onboarding (tekan Lewati)...", flush=True)
+            if detected == 'onboarding':
+                print(f"WAIT|{elapsed:.1f}|Terdeteksi layar Onboarding: Menekan 'Lewati'...", flush=True)
                 run_adb(device_id, 'shell', 'input', 'tap', '845', '140')
-                time.sleep(0.8)
-                continue
-            elif detected == 'onboarding_pink':
-                print(f"WAIT|{elapsed:.1f}|Menyelesaikan onboarding (tekan Mulai Sekarang)...", flush=True)
+                time.sleep(1.2)
+                # Juga coba tap Mulai Sekarang jika berada di slide terakhir
                 run_adb(device_id, 'shell', 'input', 'tap', '520', '2010')
-                time.sleep(1.5)
+                time.sleep(1.0)
                 continue
         
+        # Match target
         if detected == target_screen:
             total_time = time.time() - start_time
             print(f"SUCCESS|{total_time:.1f}|{detected}", flush=True)
@@ -110,11 +147,11 @@ def main():
             sys.exit(0)
             
         print(f"WAIT|{elapsed:.1f}|Menunggu layar '{target_screen}' (terdeteksi: '{detected}')...", flush=True)
-        time.sleep(0.8)
+        time.sleep(1.0)
         
     # Timeout reached
     total_time = time.time() - start_time
-    print(f"TIMEOUT|{total_time:.1f}|Gagal mencapai layar '{target_screen}' dalam batas waktu", flush=True)
+    print(f"TIMEOUT|{total_time:.1f}|Gagal mencapai layar '{target_screen}' dalam batas waktu {timeout_sec}s", flush=True)
     sys.exit(1)
 
 if __name__ == '__main__':

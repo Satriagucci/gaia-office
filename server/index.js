@@ -305,20 +305,77 @@ function writeScenarioYaml(scenario, content) {
   writeFileSync(p, content, 'utf-8')
 }
 
+function readScenarioRuns(scenario) {
+  const p = join(SCREENSHOTS_DIR, scenario, 'runs.json')
+  try { return JSON.parse(readFileSync(p, 'utf-8')) } catch { return [] }
+}
+
+function writeScenarioRuns(scenario, runs) {
+  const p = join(SCREENSHOTS_DIR, scenario, 'runs.json')
+  mkdirSync(join(SCREENSHOTS_DIR, scenario), { recursive: true })
+  writeFileSync(p, JSON.stringify(runs, null, 2), 'utf-8')
+}
+
+function getScenarioStatus(scenario) {
+  const md = readScenarioMd(scenario)
+  if (!md) return 'new'
+  if (/## Status[\r\n\s]*✅/i.test(md) || (md.includes('✅') && !md.includes('❌') && !md.includes('⏳'))) return 'pass'
+  if (/## Status[\r\n\s]*❌/i.test(md) || md.includes('❌')) return 'fail'
+  if (md.includes('⏳')) return 'pending'
+  return 'new'
+}
+
+function updateScenarioStatus(scenario, status, message = '') {
+  let md = readScenarioMd(scenario) || `# Skenario ${scenario}\n\n## Status\n⏳ PENDING\n\n## Deskripsi\nPengujian alur ${scenario}`
+  const statusLine = status === 'pass' ? '✅ PASS' : status === 'fail' ? '❌ FAIL' : '⏳ PENDING'
+  const timeStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+
+  if (/## Status[\r\n]+[^\r\n]+/i.test(md)) {
+    md = md.replace(/## Status[\r\n]+[^\r\n]+/i, `## Status\n${statusLine}`)
+  } else {
+    md = md.replace(/(# [^\r\n]+)/, `$1\n\n## Status\n${statusLine}`)
+  }
+
+  const historyNote = `\n\n### Eksekusi Terakhir (${timeStr} WIB)\n- Status: [${status.toUpperCase()}] ${message || 'Pengujian selesai'}`
+  if (md.includes('### Eksekusi Terakhir')) {
+    md = md.replace(/### Eksekusi Terakhir[\s\S]*?(?=\n## |$)/, historyNote.trim())
+  } else {
+    md += historyNote
+  }
+
+  writeScenarioMd(scenario, md)
+}
+
+function readScenarioTestCode(scenario) {
+  const dir = join(__dirname, '..', 'qa-automation', 'scenarios')
+  try {
+    const files = readdirSync(dir).filter(f => f.endsWith('.test.js'))
+    const match = files.find(f => 
+      f.includes(scenario) || 
+      scenario.includes(f.replace('.test.js', '')) || 
+      (f.slice(0, 2) === scenario.slice(0, 2) && /^\d\d/.test(scenario))
+    )
+    if (match) {
+      return readFileSync(join(dir, match), 'utf-8')
+    }
+  } catch {}
+  return null
+}
+
 // ── JSON API: all scenarios ──
 app.get('/api/scenarios', (_req, res) => {
   const scenarios = listScenarios().map(s => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = md ? (md.includes('✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+    const status = getScenarioStatus(s)
     return {
       name: s,
       captures: caps.length,
       lastCapture: caps[0]?.time || null,
       status,
       hasScript: !!md,
-      hasAutomation: !!yaml,
+      hasAutomation: !!yaml || !!readScenarioTestCode(s),
     }
   })
   res.json({ count: scenarios.length, scenarios })
@@ -331,8 +388,10 @@ app.get('/api/scenarios/:name', (req, res) => {
   const caps = listCaptures(name)
   const md = readScenarioMd(name)
   const yaml = readScenarioYaml(name)
-  const status = md ? (md.includes('## Status\n✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
-  res.json({ name, captures: caps, script: md, automation: yaml, status })
+  const status = getScenarioStatus(name)
+  const runs = readScenarioRuns(name)
+  const testScript = readScenarioTestCode(name)
+  res.json({ name, captures: caps, script: md, automation: yaml, status, runs, testScript })
 })
 
 app.post('/api/scenarios/:name/script', (req, res) => {
@@ -356,7 +415,7 @@ app.post('/api/scenarios/:name/automation', (req, res) => {
 // ── Upload capture from local runner ──
 app.post('/api/scenarios/:scenario/upload-capture', (req, res) => {
   const scenario = decodeURIComponent(req.params.scenario).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase()
-  const { image, filename } = req.body
+  const { image, filename, runId, stepIndex, total, name, duration, status } = req.body || {}
   if (!image) return res.status(400).json({ ok: false, error: 'No image provided' })
   const dir = join(SCREENSHOTS_DIR, scenario)
   mkdirSync(dir, { recursive: true })
@@ -364,6 +423,44 @@ app.post('/api/scenarios/:scenario/upload-capture', (req, res) => {
   const buf = Buffer.from(image, 'base64')
   writeFileSync(join(dir, targetFile), buf)
   try { writeFileSync(join(dir, 'latest.png'), buf) } catch {}
+
+  // Run History tracking in runs.json
+  try {
+    const runs = readScenarioRuns(scenario)
+    const activeRunId = runId || `run-${new Date().toISOString().slice(0, 10)}`
+    let currentRun = runs.find(r => r.runId === activeRunId)
+    if (!currentRun) {
+      currentRun = {
+        runId: activeRunId,
+        timestamp: new Date().toISOString(),
+        timeStr: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+        status: 'running',
+        steps: []
+      }
+      runs.unshift(currentRun)
+    }
+    currentRun.lastUpdated = new Date().toISOString()
+    const stepObj = {
+      stepIndex: stepIndex || (currentRun.steps.length + 1),
+      total: total || 5,
+      name: name || targetFile,
+      filename: targetFile,
+      duration: duration || null,
+      status: status || 'pass',
+      time: new Date().toISOString()
+    }
+    const existingStepIdx = currentRun.steps.findIndex(s => s.stepIndex === stepObj.stepIndex)
+    if (existingStepIdx >= 0) {
+      currentRun.steps[existingStepIdx] = stepObj
+    } else {
+      currentRun.steps.push(stepObj)
+    }
+    if (runs.length > 20) runs.length = 20
+    writeScenarioRuns(scenario, runs)
+  } catch (err) {
+    console.warn('[upload-capture] Gagal mencatat runs.json:', err.message)
+  }
+
   res.json({ ok: true, filename: targetFile })
 })
 
@@ -422,14 +519,14 @@ app.get('/screenshots', (_req, res) => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = md ? (md.includes('✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+    const status = getScenarioStatus(s)
     return {
       name: s,
       captures: caps.length,
       lastCapture: caps[0]?.time || null,
       status,
       hasScript: !!md,
-      hasAutomation: !!yaml,
+      hasAutomation: !!yaml || !!readScenarioTestCode(s),
     }
   })
   res.send(renderTestBankView({ scenarios }))
@@ -444,9 +541,11 @@ app.get('/screenshots/:scenario', (req, res) => {
   const caps = listCaptures(scenario)
   const md = readScenarioMd(scenario)
   const yaml = readScenarioYaml(scenario)
-  const status = md ? (md.includes('## Status\n✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+  const status = getScenarioStatus(scenario)
+  const runs = readScenarioRuns(scenario)
+  const testScript = readScenarioTestCode(scenario)
 
-  res.send(renderScenarioDetailView({ scenario, caps, md, yaml, status }))
+  res.send(renderScenarioDetailView({ scenario, caps, md, yaml, status, runs, testScript }))
 })
 
 // ── Delete scenario ──
@@ -543,15 +642,41 @@ app.get('/screenshots/:scenario/run', (req, res) => {
     send({ type: 'info', message: `Menjalankan skenario di Android Emulator (${activeRunner.device})...` })
 
     activeJobs.set(jobId, {
+      onLog: (msg) => send({ type: 'info', message: msg }),
       onProgress: (p) => send({ ...p, type: 'progress', percent: p.percent || p.progressPct }),
       onStep: (s) => send({ ...s, type: 'step', name: s.name || s.description }),
       onResult: (r) => {
+        try {
+          updateScenarioStatus(scenario, r.status, r.message)
+          const runs = readScenarioRuns(scenario)
+          const runEntry = runs.find(run => run.runId === jobId) || runs[0]
+          if (runEntry) {
+            runEntry.status = r.status
+            runEntry.summaryMessage = r.message
+            writeScenarioRuns(scenario, runs)
+          }
+        } catch (e) {
+          console.warn('[runner] Error updating scenario on result:', e.message)
+        }
         send({ ...r, type: 'result' })
         activeJobs.delete(jobId)
         res.end()
       },
       onError: (err) => {
-        send({ type: 'error', message: err })
+        const errMsg = err?.message || String(err)
+        try {
+          updateScenarioStatus(scenario, 'fail', errMsg)
+          const runs = readScenarioRuns(scenario)
+          const runEntry = runs.find(run => run.runId === jobId) || runs[0]
+          if (runEntry) {
+            runEntry.status = 'fail'
+            runEntry.errorMessage = errMsg
+            writeScenarioRuns(scenario, runs)
+          }
+        } catch (e) {
+          console.warn('[runner] Error updating scenario on error:', e.message)
+        }
+        send({ type: 'error', message: errMsg })
         activeJobs.delete(jobId)
         res.end()
       }
@@ -695,6 +820,7 @@ app.get('/api/testbank/run-all', (req, res) => {
     send({ type: 'info', message: `🚀 Menjalankan Full E2E Suite (5 Kepingan) di Android Emulator (${activeRunner.device})...` })
 
     activeJobs.set(jobId, {
+      onLog: (msg) => send({ type: 'info', message: msg }),
       onProgress: (p) => send({ ...p, type: 'progress', percent: p.percent || p.progressPct }),
       onStep: (s) => send({ ...s, type: 'step', name: s.name || s.description }),
       onResult: (r) => {
@@ -703,7 +829,7 @@ app.get('/api/testbank/run-all', (req, res) => {
         res.end()
       },
       onError: (err) => {
-        send({ type: 'error', message: err })
+        send({ type: 'error', message: err?.message || String(err) })
         activeJobs.delete(jobId)
         res.end()
       }

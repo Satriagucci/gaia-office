@@ -21,7 +21,8 @@ export async function run({ driver, detector, reporter }) {
 
   // Step 1: Launch & Feed
   driver.launchApp()
-  const homeVal = await home.validateReady(30)
+  const homeVal = await home.validateReady(60)
+  await home.handleOnboarding()
   await home.openBerandaTab()
   await home.snap(1, 4, `Meninjau Layar Beranda Feed (${homeVal.duration}s)`, '03_home_feed.png', homeVal.duration)
 

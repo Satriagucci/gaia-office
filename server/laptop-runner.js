@@ -511,6 +511,7 @@ async function handleTest(cmd) {
   if (modularKeys.some(k => scenario.includes(k))) {
     try {
       await runQaPipeline(scenario, {
+        jobId,
         onLog: (msg) => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'runner_log', jobId, message: msg }))
