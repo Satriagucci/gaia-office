@@ -74,7 +74,12 @@ export async function runTestBankSuite({ filterScenario = null } = {}) {
     order: null
   };
 
-  const shouldRun = (name) => !filterScenario || name.toLowerCase().includes(filterScenario.toLowerCase());
+  const shouldRun = (name) => {
+    if (!filterScenario) return true;
+    const f = filterScenario.toLowerCase();
+    const n = name.toLowerCase();
+    return f.includes(n) || n.includes(f);
+  };
 
   // ─────────────────────────────────────────────────────────────
   // 1. KEPINGAN 01: DAFTAR
