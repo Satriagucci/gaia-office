@@ -253,59 +253,143 @@ async function snapStep(device, scenario, current, total, name, filename, jobId)
   }
 }
 
+function validateScreenStep(device, targetScreen, jobId, timeoutSec = 25) {
+  return new Promise((resolve, reject) => {
+    const pyScript = join(__dirname, 'validate_screen.py')
+    const py = spawn('python', [pyScript, device.id, targetScreen, String(timeoutSec)], {
+      windowsHide: true
+    })
+
+    let lastDuration = '0.0'
+    let lastMsg = ''
+
+    py.stdout.on('data', (d) => {
+      const text = d.toString()
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+      for (const line of lines) {
+        const parts = line.split('|')
+        if (parts[0] === 'WAIT') {
+          const elapsed = parts[1]
+          const msg = parts[2]
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'runner_log',
+              jobId,
+              message: `⏳ [${elapsed}s] ${msg}`
+            }))
+          }
+        } else if (parts[0] === 'SUCCESS') {
+          lastDuration = parts[1]
+          lastMsg = parts[2]
+        } else if (parts[0] === 'TIMEOUT') {
+          lastDuration = parts[1]
+          lastMsg = parts[2]
+        }
+      }
+    })
+
+    py.on('close', (code) => {
+      if (code === 0) {
+        resolve({ ok: true, duration: lastDuration, detected: lastMsg })
+      } else {
+        reject(new Error(lastMsg || `Gagal memvalidasi layar '${targetScreen}' setelah ${lastDuration}s`))
+      }
+    })
+
+    py.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
 async function runModularMobileFlow(device, scenario, jobId) {
   const isAll = scenario === 'all' || scenario === 'all-scenarios'
   const list = isAll 
     ? ['01-daftar', '02-login', '03-membuat-misi', '04-melakukan-pembayaran', '05-mengambil-misi']
     : [scenario]
 
+  // Pastikan emulator tetap menyala dan tidak tertutup lockscreen/sleep
+  try {
+    execSync(`adb -s ${device.id} shell svc power stayon true`)
+    execSync(`adb -s ${device.id} shell wm dismiss-keyguard`)
+    execSync(`adb -s ${device.id} shell am force-stop com.android.vending`)
+  } catch {}
+
   for (const sc of list) {
     console.log(`\n[mobile-test] Menjalankan skenario di emulator (${device.id}): ${sc}...`)
 
     if (sc === '01-daftar' || sc.includes('daftar')) {
-      // Step 1: Launch
-      execSync(`adb -s ${device.id} shell am start -S -n com.bukainjalan.app/.MainActivity`, { timeout: 10000 })
-      await sleep(2500)
-      await snapStep(device, sc, 1, 5, 'Meluncurkan Aplikasi BukainJalan di Layar Utama', '01_home_screen.png', jobId)
+      // Step 1: Launch & Validate Home Screen
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'runner_log',
+          jobId,
+          message: '🚀 Meluncurkan aplikasi BukainJalan & memvalidasi kesiapan Layar Utama...'
+        }))
+      }
+      execSync(`adb -s ${device.id} shell am start -n com.bukainjalan.app/.MainActivity`, { timeout: 10000 })
+      const homeVal = await validateScreenStep(device, 'home', jobId, 30)
+      await snapStep(device, sc, 1, 5, `Layar Utama Terbuka & Tervalidasi (${homeVal.duration}s)`, '01_home_screen.png', jobId)
 
-      // Step 2: Open Profil
+      // Step 2: Open Profil & Validate Auth Sheet
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'runner_log',
+          jobId,
+          message: '👤 Menekan menu Profil & menunggu Sheet Autentikasi...'
+        }))
+      }
       execSync(`adb -s ${device.id} shell input tap 900 2080`)
-      await sleep(1500)
-      await snapStep(device, sc, 2, 5, 'Membuka Menu Profil & Sheet Autentikasi', '01_auth_sheet.png', jobId)
+      const authVal = await validateScreenStep(device, 'auth_sheet', jobId, 10)
+      await snapStep(device, sc, 2, 5, `Menu Profil & Sheet Autentikasi Tervalidasi (${authVal.duration}s)`, '01_auth_sheet.png', jobId)
 
-      // Step 3: Open Register Form
-      execSync(`adb -s ${device.id} shell input tap 540 1912`)
-      await sleep(2000)
-      await snapStep(device, sc, 3, 5, 'Membuka Form Pendaftaran Akun Baru', '01_register_form.png', jobId)
+      // Step 3: Open Register Form & Validate Form
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'runner_log',
+          jobId,
+          message: '📝 Membuka Form Pendaftaran Akun Baru...'
+        }))
+      }
+      execSync(`adb -s ${device.id} shell input tap 540 1890`)
+      const formVal = await validateScreenStep(device, 'register_form', jobId, 10)
+      await snapStep(device, sc, 3, 5, `Form Pendaftaran Akun Baru Terbuka (${formVal.duration}s)`, '01_register_form.png', jobId)
 
       // Step 4: Fill form
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'runner_log',
+          jobId,
+          message: '✍️ Mengisi field data registrasi (Nama, Username, Email, No. HP, Password)...'
+        }))
+      }
       const rand = Math.floor(Math.random() * 900 + 100)
       execSync(`adb -s ${device.id} shell input tap 500 950`)
-      await sleep(300)
+      await sleep(400)
       execSync(`adb -s ${device.id} shell input text "QA%sTester%sPro"`)
       execSync(`adb -s ${device.id} shell input keyevent 4`)
       await sleep(300)
 
       execSync(`adb -s ${device.id} shell input tap 500 1220`)
-      await sleep(300)
+      await sleep(400)
       execSync(`adb -s ${device.id} shell input text "qatester${rand}"`)
       execSync(`adb -s ${device.id} shell input keyevent 4`)
       await sleep(300)
 
       execSync(`adb -s ${device.id} shell input tap 500 1490`)
-      await sleep(300)
+      await sleep(400)
       execSync(`adb -s ${device.id} shell input text "qa.reg.${Date.now()}@bukainjalan.test"`)
       execSync(`adb -s ${device.id} shell input keyevent 4`)
       await sleep(300)
 
       execSync(`adb -s ${device.id} shell input tap 500 1750`)
-      await sleep(300)
+      await sleep(400)
       execSync(`adb -s ${device.id} shell input text "081299887766"`)
       execSync(`adb -s ${device.id} shell input keyevent 4`)
       await sleep(300)
 
       execSync(`adb -s ${device.id} shell input tap 500 2020`)
-      await sleep(300)
+      await sleep(400)
       execSync(`adb -s ${device.id} shell input text "Password123!"`)
       execSync(`adb -s ${device.id} shell input keyevent 4`)
       await sleep(600)
@@ -314,7 +398,7 @@ async function runModularMobileFlow(device, scenario, jobId) {
       // Step 5: Checkbox & Submit
       execSync(`adb -s ${device.id} shell input swipe 540 1800 540 800 300`)
       await sleep(600)
-      execSync(`adb -s ${device.id} shell input tap 146 1587`) // Checkbox
+      execSync(`adb -s ${device.id} shell input tap 146 1587`) // Checkbox S&K
       await sleep(500)
       execSync(`adb -s ${device.id} shell input tap 540 1800`) // Daftar Sekarang
       await sleep(3000)
@@ -322,8 +406,8 @@ async function runModularMobileFlow(device, scenario, jobId) {
     }
     else if (sc === '02-login' || sc.includes('login')) {
       execSync(`adb -s ${device.id} shell am start -n com.bukainjalan.app/.MainActivity`)
-      await sleep(2000)
-      await snapStep(device, sc, 1, 4, 'Meluncurkan Aplikasi BukainJalan', '02_home.png', jobId)
+      const homeVal = await validateScreenStep(device, 'home', jobId, 30)
+      await snapStep(device, sc, 1, 4, `Meluncurkan Aplikasi BukainJalan (${homeVal.duration}s)`, '02_home.png', jobId)
 
       execSync(`adb -s ${device.id} shell input tap 900 2080`)
       await sleep(1500)
@@ -349,10 +433,10 @@ async function runModularMobileFlow(device, scenario, jobId) {
     }
     else if (sc === '03-membuat-misi' || sc.includes('misi')) {
       execSync(`adb -s ${device.id} shell am start -n com.bukainjalan.app/.MainActivity`)
-      await sleep(2000)
+      const homeVal = await validateScreenStep(device, 'home', jobId, 30)
       execSync(`adb -s ${device.id} shell input tap 100 2080`)
       await sleep(1000)
-      await snapStep(device, sc, 1, 4, 'Meninjau Layar Beranda Feed', '03_home_feed.png', jobId)
+      await snapStep(device, sc, 1, 4, `Meninjau Layar Beranda Feed (${homeVal.duration}s)`, '03_home_feed.png', jobId)
 
       execSync(`adb -s ${device.id} shell input tap 540 2050`)
       await sleep(2000)
@@ -367,10 +451,10 @@ async function runModularMobileFlow(device, scenario, jobId) {
     }
     else if (sc === '04-melakukan-pembayaran' || sc.includes('bayar') || sc.includes('pembayaran')) {
       execSync(`adb -s ${device.id} shell am start -n com.bukainjalan.app/.MainActivity`)
-      await sleep(2000)
+      const homeVal = await validateScreenStep(device, 'home', jobId, 30)
       execSync(`adb -s ${device.id} shell input tap 100 2080`)
       await sleep(1000)
-      await snapStep(device, sc, 1, 3, 'Kembali ke Layar Beranda', '04_home_balance.png', jobId)
+      await snapStep(device, sc, 1, 3, `Kembali ke Layar Beranda (${homeVal.duration}s)`, '04_home_balance.png', jobId)
 
       execSync(`adb -s ${device.id} shell input tap 540 420`)
       await sleep(2000)
@@ -381,10 +465,10 @@ async function runModularMobileFlow(device, scenario, jobId) {
     }
     else if (sc === '05-mengambil-misi' || sc.includes('ambil')) {
       execSync(`adb -s ${device.id} shell am start -n com.bukainjalan.app/.MainActivity`)
-      await sleep(2000)
+      const homeVal = await validateScreenStep(device, 'home', jobId, 30)
       execSync(`adb -s ${device.id} shell input tap 295 2080`)
       await sleep(2500)
-      await snapStep(device, sc, 1, 3, 'Membuka Peta Radar Misi di Sekitar', '05_radar_map.png', jobId)
+      await snapStep(device, sc, 1, 3, `Membuka Peta Radar Misi di Sekitar (${homeVal.duration}s)`, '05_radar_map.png', jobId)
 
       execSync(`adb -s ${device.id} shell input tap 720 180`)
       await sleep(2000)
