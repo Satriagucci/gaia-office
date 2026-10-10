@@ -14,6 +14,8 @@ import { readFileSync, existsSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
+import { dumpHierarchy, findNodeByText, clickText, getPerformanceStats } from './adb-helper.js'
+import { runOrganicUserSimulation } from './simulator/organic-user.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -249,17 +251,59 @@ async function handleTest(cmd) {
       }))
     }
 
-    // Jalankan action jika ada action khusus
+    // Jalankan action dinamis
+    let stepStatus = 'pass'
+    let stepMetric = null
+
     try {
-      if (step.action === 'tap' && step.x && step.y) {
+      if (step.action === 'launch_app') {
+        const pkg = step.package || 'com.bukainjalan.app'
+        const act = step.activity || '.MainActivity'
+        execSync(`adb -s ${device.id} shell am start -n ${pkg}/${act}`, { timeout: 10000 })
+      } else if (step.action === 'click_text' || step.action === 'tap_text') {
+        const clickRes = clickText(device.id, step.text)
+        if (!clickRes.success) {
+          console.warn(`[test] Click text warning: ${clickRes.error}`)
+          stepStatus = step.critical ? 'fail' : 'warning'
+        } else {
+          console.log(`[test] Click text '${step.text}' berhasil pada koordinat (${clickRes.x}, ${clickRes.y})`)
+        }
+      } else if (step.action === 'click_coord' || (step.action === 'tap' && step.x && step.y)) {
         execSync(`adb -s ${device.id} shell input tap ${step.x} ${step.y}`)
+      } else if (step.action === 'swipe' || step.action === 'scroll') {
+        const x1 = step.x1 || 500
+        const y1 = step.y1 || 1400
+        const x2 = step.x2 || 500
+        const y2 = step.y2 || 500
+        const dur = step.duration || 400
+        execSync(`adb -s ${device.id} shell input swipe ${x1} ${y1} ${x2} ${y2} ${dur}`)
       } else if (step.action === 'type' && step.text) {
-        execSync(`adb -s ${device.id} shell input text "${step.text}"`)
+        const safeText = String(step.text).replace(/ /g, '%s')
+        execSync(`adb -s ${device.id} shell input text "${safeText}"`)
       } else if (step.action === 'press') {
         execSync(`adb -s ${device.id} shell input keyevent ${step.key || 'KEYCODE_HOME'}`)
+      } else if (step.action === 'assert_text') {
+        const nodes = dumpHierarchy(device.id)
+        const found = findNodeByText(nodes, step.text)
+        if (!found) {
+          console.warn(`[test] Assert failed: Teks "${step.text}" tidak muncul di layar!`)
+          stepStatus = 'fail'
+        } else {
+          console.log(`[test] Assert pass: Teks "${step.text}" terverifikasi di layar`)
+        }
+      } else if (step.action === 'performance' || step.action === 'measure_performance') {
+        const perf = getPerformanceStats(device.id, step.package || 'com.bukainjalan.app')
+        console.log(`[test] Performance Metric: RAM ${perf.memoryPssMb}MB, Jank ${perf.jankPercent}%`)
+        stepMetric = `RAM: ${perf.memoryPssMb}MB | Jank: ${perf.jankPercent}%`
+      } else if (step.action === 'simulate_organic_user') {
+        console.log(`[test] Menjalankan Organic User Lifecycle Simulator...`)
+        const simRes = await runOrganicUserSimulation({ iterations: step.iterations || 1 })
+        console.log(`[test] Simulator selesai: Passed ${simRes.passed}/${simRes.totalSimulations}`)
+        stepMetric = `Register: ${simRes.metrics.avgRegisterMs}ms | Home SDUI: ${simRes.metrics.avgHomeSduiMs}ms`
       }
     } catch (e) {
       console.warn(`[test] Action warning: ${e.message}`)
+      if (step.critical) stepStatus = 'fail'
     }
 
     // Tunggu sesuai delay step
@@ -296,8 +340,8 @@ async function handleTest(cmd) {
         type: 'runner_step',
         jobId,
         stepIndex: stepNum,
-        name: step.description || `Step ${stepNum}`,
-        status: 'pass',
+        name: (step.description || `Step ${stepNum}`) + (stepMetric ? ` (${stepMetric})` : ''),
+        status: stepStatus,
         screenshot: screenshotName
       }))
     }

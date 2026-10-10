@@ -211,6 +211,53 @@ function parseMdSteps(content) {
   return steps
 }
 
+function parseYamlSteps(yamlContent) {
+  if (!yamlContent) return []
+  const steps = []
+  const lines = yamlContent.split('\n')
+  let currentStep = null
+  let inSteps = false
+
+  for (let rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+
+    if (line.startsWith('steps:')) {
+      inSteps = true
+      continue
+    }
+
+    if (inSteps) {
+      if (line.startsWith('- ')) {
+        if (currentStep) steps.push(currentStep)
+        currentStep = {}
+        const rest = line.substring(2).trim()
+        if (rest) {
+          const colonIdx = rest.indexOf(':')
+          if (colonIdx > 0) {
+            const key = rest.substring(0, colonIdx).trim()
+            let val = rest.substring(colonIdx + 1).trim().replace(/^["']|["']$/g, '')
+            if (val === 'true') val = true
+            else if (val === 'false') val = false
+            else if (!isNaN(Number(val)) && val !== '') val = Number(val)
+            currentStep[key] = val
+          }
+        }
+      } else if (currentStep && line.includes(':')) {
+        const colonIdx = line.indexOf(':')
+        const key = line.substring(0, colonIdx).trim()
+        let val = line.substring(colonIdx + 1).trim().replace(/^["']|["']$/g, '')
+        if (val === 'true') val = true
+        else if (val === 'false') val = false
+        else if (!isNaN(Number(val)) && val !== '') val = Number(val)
+        currentStep[key] = val
+      }
+    }
+  }
+  if (currentStep) steps.push(currentStep)
+  return steps
+}
+
 // ──────────────────────────────────────────────
 // TEST BANK & RUNNER PIPELINE
 // ──────────────────────────────────────────────
@@ -252,6 +299,12 @@ function readScenarioYaml(scenario) {
   try { return readFileSync(p, 'utf-8') } catch { return null }
 }
 
+function writeScenarioYaml(scenario, content) {
+  const p = join(SCREENSHOTS_DIR, scenario, 'scenario.yaml')
+  mkdirSync(join(SCREENSHOTS_DIR, scenario), { recursive: true })
+  writeFileSync(p, content, 'utf-8')
+}
+
 // ── JSON API: all scenarios ──
 app.get('/api/scenarios', (_req, res) => {
   const scenarios = listScenarios().map(s => {
@@ -288,6 +341,15 @@ app.post('/api/scenarios/:name/script', (req, res) => {
   const { content } = req.body
   if (!content) return res.status(400).json({ ok: false })
   writeScenarioMd(name, content)
+  res.json({ ok: true })
+})
+
+app.post('/api/scenarios/:name/automation', (req, res) => {
+  const name = decodeURIComponent(req.params.name).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase()
+  if (!name) return res.status(400).json({ ok: false })
+  const { content } = req.body
+  if (!content) return res.status(400).json({ ok: false })
+  writeScenarioYaml(name, content)
   res.json({ ok: true })
 })
 
@@ -465,8 +527,12 @@ app.get('/screenshots/:scenario/run', (req, res) => {
       return res.end()
     }
 
-    const md = readScenarioMd(scenario)
-    const steps = parseMdSteps(md)
+    const yaml = readScenarioYaml(scenario)
+    let steps = parseYamlSteps(yaml)
+    if (steps.length === 0) {
+      const md = readScenarioMd(scenario)
+      steps = parseMdSteps(md)
+    }
     if (steps.length === 0) {
       send({ type: 'error', message: 'Tidak ada step di skenario ini.' })
       return res.end()

@@ -43,6 +43,25 @@ if (-not $SkipBuild) {
     # 3. Pindah ke project
     Set-Location $ProjectDir
 
+    # Injeksi Environment Variables dari eas.json berdasarkan Profile
+    $easJsonPath = "$ProjectDir\eas.json"
+    if (Test-Path $easJsonPath) {
+        try {
+            $eas = Get-Content $easJsonPath -Raw | ConvertFrom-Json
+            $targetEnv = $eas.build.$Profile.env
+            if ($targetEnv) {
+                Write-BuildLog "BUILD_LOG" "Memuat environment variables dari eas.json (profile: $Profile)..."
+                $targetEnv.PSObject.Properties | ForEach-Object {
+                    [System.Environment]::SetEnvironmentVariable($_.Name, $_.Value, "Process")
+                    Set-Item -Path "env:$($_.Name)" -Value $_.Value
+                    Write-BuildLog "BUILD_LOG" "  $($_.Name) = $($_.Value)"
+                }
+            }
+        } catch {
+            Write-BuildLog "BUILD_LOG" "Peringatan: Gagal memuat env dari eas.json: $_"
+        }
+    }
+
     # 4. Native Expo Gradle Pipeline (Direct, 0 EAS wait, isolated cache)
     if (-not (Test-Path "$ProjectDir\android")) {
         Write-BuildLog "BUILD_LOG" "Menjalankan npx expo prebuild --platform android..."
