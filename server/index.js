@@ -311,7 +311,7 @@ app.get('/api/scenarios', (_req, res) => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = md ? (md.includes('## Status\n✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+    const status = md ? (md.includes('✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
     return {
       name: s,
       captures: caps.length,
@@ -384,7 +384,7 @@ app.get('/', (_req, res) => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = md ? (md.includes('## Status\n✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+    const status = md ? (md.includes('✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
     return {
       name: s,
       captures: caps.length,
@@ -422,7 +422,7 @@ app.get('/screenshots', (_req, res) => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = md ? (md.includes('## Status\n✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
+    const status = md ? (md.includes('✅') ? 'pass' : md.includes('⏳') ? 'pending' : 'fail') : 'new'
     return {
       name: s,
       captures: caps.length,
