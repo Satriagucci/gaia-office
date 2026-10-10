@@ -44,7 +44,7 @@ export async function testDaftar({ baseUrl = BASE_URL } = {}) {
       throw new Error(`Registrasi gagal (${regRes.status}): ${JSON.stringify(regData)}`);
     }
 
-    const userId = regData.data?.id || regData.id;
+    const userId = regData.data?.user?.id || regData.data?.id || regData.id;
     const accessToken = regData.data?.accessToken || regData.accessToken;
 
     results.tests.push({

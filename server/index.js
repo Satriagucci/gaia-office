@@ -567,10 +567,74 @@ app.get('/screenshots/:scenario/run', (req, res) => {
     return
   }
 
-  // JIKA TARGET VPS
+  // JIKA TARGET ENGINE / VPS / DEFAULT
+  const testBankScript = join(__dirname, 'testbank', 'test-bank-runner.js')
+  if (existsSync(testBankScript)) {
+    const isAll = scenario === 'all' || scenario === 'all-scenarios'
+    const scriptArgs = isAll ? [testBankScript] : [testBankScript, `--scenario=${scenario}`]
+
+    send({ type: 'info', message: `Menjalankan Test Bank Engine untuk skenario: ${scenario}...` })
+
+    const proc = spawn('node', scriptArgs, {
+      cwd: join(__dirname, '..'),
+      env: { ...process.env, API_BASE_URL: process.env.API_BASE_URL || 'https://api-staging.bukainjalan.com' }
+    })
+
+    let currentStep = 0
+    let totalSteps = isAll ? 5 : 3
+    let hasFailed = false
+    let aborted = false
+
+    req.on('close', () => {
+      aborted = true
+      try { proc.kill() } catch {}
+    })
+
+    proc.stdout.on('data', (d) => {
+      if (aborted) return
+      const text = d.toString()
+      const lines = text.split('\n').filter(l => l.trim())
+      for (const line of lines) {
+        if (line.includes('▶')) {
+          send({ type: 'info', message: line.trim() })
+        } else if (line.includes('✓')) {
+          currentStep++
+          const pct = Math.min(100, Math.round((currentStep / totalSteps) * 100))
+          send({ type: 'step', name: line.trim(), status: 'pass', current: currentStep, percent: pct })
+          send({ type: 'progress', current: currentStep, total: totalSteps, percent: pct })
+        } else if (line.includes('✗')) {
+          hasFailed = true
+          send({ type: 'step', name: line.trim(), status: 'fail' })
+        } else {
+          send({ type: 'info', message: line.trim() })
+        }
+      }
+    })
+
+    proc.stderr.on('data', (d) => {
+      if (aborted) return
+      send({ type: 'info', message: 'stderr: ' + d.toString().trim() })
+    })
+
+    proc.on('exit', (code) => {
+      if (aborted) return
+      const pass = code === 0 && !hasFailed
+      send({
+        type: 'result',
+        status: pass ? 'pass' : 'fail',
+        message: pass 
+          ? `Eksekusi skenario ${scenario} LULUS (100% Passed)!` 
+          : `Eksekusi skenario ${scenario} GAGAL (Exit code ${code})`
+      })
+      res.end()
+    })
+    return
+  }
+
+  // Fallback ke Python runner jika ada
   const runnerScript = join(__dirname, 'test-runner.py')
   if (!existsSync(runnerScript)) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Runner script not found' })}\n\n`)
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Test runner script tidak ditemukan' })}\n\n`)
     return res.end()
   }
 
@@ -607,6 +671,73 @@ app.get('/screenshots/:scenario/run', (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`)
       res.end()
     }
+  })
+})
+
+// ── Run All Test Bank Scenarios via SSE ──
+app.get('/api/testbank/run-all', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  })
+
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  const testBankScript = join(__dirname, 'testbank', 'test-bank-runner.js')
+
+  send({ type: 'info', message: '🚀 Memulai eksekusi 5 Kepingan Test Bank (Full E2E Pipeline)...' })
+
+  const proc = spawn('node', [testBankScript], {
+    cwd: join(__dirname, '..'),
+    env: { ...process.env, API_BASE_URL: process.env.API_BASE_URL || 'https://api-staging.bukainjalan.com' }
+  })
+
+  let currentStep = 0
+  let totalSteps = 5
+  let hasFailed = false
+  let aborted = false
+
+  req.on('close', () => {
+    aborted = true
+    try { proc.kill() } catch {}
+  })
+
+  proc.stdout.on('data', (d) => {
+    if (aborted) return
+    const text = d.toString()
+    const lines = text.split('\n').filter(l => l.trim())
+    for (const line of lines) {
+      if (line.includes('▶')) {
+        send({ type: 'info', message: line.trim() })
+      } else if (line.includes('✓')) {
+        currentStep++
+        const pct = Math.min(100, Math.round((currentStep / totalSteps) * 100))
+        send({ type: 'step', name: line.trim(), status: 'pass', current: currentStep, percent: pct })
+        send({ type: 'progress', current: currentStep, total: totalSteps, percent: pct })
+      } else if (line.includes('✗')) {
+        hasFailed = true
+        send({ type: 'step', name: line.trim(), status: 'fail' })
+      } else {
+        send({ type: 'info', message: line.trim() })
+      }
+    }
+  })
+
+  proc.stderr.on('data', (d) => {
+    if (aborted) return
+    send({ type: 'info', message: 'stderr: ' + d.toString().trim() })
+  })
+
+  proc.on('exit', (code) => {
+    if (aborted) return
+    const pass = code === 0 && !hasFailed
+    send({
+      type: 'result',
+      status: pass ? 'pass' : 'fail',
+      message: pass ? '🎉 Seluruh 5 Kepingan Test Bank LULUS (100% Passed)!' : 'Sebagian kepingan pengujian gagal.'
+    })
+    res.end()
   })
 })
 

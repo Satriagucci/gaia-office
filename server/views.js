@@ -1850,18 +1850,21 @@ export function renderTestBankView({ scenarios = [] }) {
     const statusIcon = s.status === 'pass' ? '✅' : s.status === 'fail' ? '❌' : '⏳';
     const lastTime = s.captures > 0 && s.lastCapture ? s.lastCapture.slice(0, 16).replace('T', ' ') : '-';
     return `
-      <a href="/screenshots/${encodeURIComponent(s.name)}" style="text-decoration:none;color:inherit">
-        <div class="card" style="display:flex;align-items:center;gap:18px;padding:18px 22px">
-          <div style="width:48px;height:48px;border-radius:12px;background:${statusColor}18;border:1px solid ${statusColor}35;display:flex;align-items:center;justify-content:center;font-size:22px;color:${statusColor};flex-shrink:0">
-            ${statusIcon}
-          </div>
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:16px;color:#fff;margin-bottom:3px">${s.name} ${s.hasAutomation ? '🤖' : ''}</div>
-            <div style="font-size:12px;color:var(--text-muted)">${s.captures} screenshot • ${s.status.toUpperCase()} • ${lastTime}</div>
-          </div>
-          <div style="font-size:20px;color:var(--text-muted)">›</div>
+      <div class="card" style="display:flex;align-items:center;gap:18px;padding:18px 22px;transition:all 0.2s">
+        <div style="width:48px;height:48px;border-radius:12px;background:${statusColor}18;border:1px solid ${statusColor}35;display:flex;align-items:center;justify-content:center;font-size:22px;color:${statusColor};flex-shrink:0">
+          ${statusIcon}
         </div>
-      </a>
+        <a href="/screenshots/${encodeURIComponent(s.name)}" style="text-decoration:none;color:inherit;flex:1">
+          <div style="font-weight:700;font-size:16px;color:#fff;margin-bottom:3px">${s.name} ${s.hasAutomation ? '🤖' : ''}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${s.captures} screenshot • <span style="color:${statusColor};font-weight:700">${s.status.toUpperCase()}</span> • ${lastTime}</div>
+        </a>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="runScenarioQuick('${s.name}', event)" class="btn btn-success btn-sm" style="display:flex;align-items:center;gap:6px;font-weight:700;padding:8px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(16,185,129,0.25)">
+            ▶ Run Kepingan
+          </button>
+          <a href="/screenshots/${encodeURIComponent(s.name)}" class="btn btn-secondary btn-sm" style="text-decoration:none;padding:8px 12px;border-radius:8px">Detail ›</a>
+        </div>
+      </div>
     `;
   }).join('');
 
@@ -1870,10 +1873,13 @@ export function renderTestBankView({ scenarios = [] }) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
       <div>
         <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.5px">🧪 Test Bank & Automation</h1>
-        <p style="color:var(--text-muted);font-size:14px">Kumpulan skenario pengujian mobile flow BukainJalan dengan integrasi ADB.</p>
+        <p style="color:var(--text-muted);font-size:14px">Kumpulan skenario pengujian modular & live pipeline BukainJalan.</p>
       </div>
-      <div>
-        <button onclick="document.getElementById('newScenarioModal').classList.add('active')" class="btn btn-primary">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button onclick="runAllScenariosQuick()" class="btn btn-success" style="font-weight:800;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg, #10b981 0%, #059669 100%);box-shadow:0 4px 14px rgba(16,185,129,0.35);padding:10px 18px;border-radius:9px">
+          ▶ Run Semua Kepingan (Full E2E)
+        </button>
+        <button onclick="document.getElementById('newScenarioModal').classList.add('active')" class="btn btn-secondary" style="border-radius:9px;padding:10px 16px">
           + Scenario Baru
         </button>
       </div>
@@ -1901,10 +1907,191 @@ export function renderTestBankView({ scenarios = [] }) {
       </div>
     </div>
   </div>
+
+  <!-- Live Test Bank Execution Modal -->
+  <div id="testRunModal" class="modal-overlay">
+    <div class="modal" style="max-width:760px;width:95%;background:#0b1120;border:1px solid var(--border);box-shadow:0 25px 50px -12px rgba(0,0,0,0.7)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">⚡</span>
+          <div>
+            <h2 id="modalRunTitle" style="font-size:18px;font-weight:800;margin:0;color:#fff">Menjalankan Pengujian...</h2>
+            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Connecting to Test Bank Engine...</div>
+          </div>
+        </div>
+        <span id="modalRunBadge" class="jenkins-badge yellow" style="font-size:12px;padding:4px 10px">#RUNNING</span>
+      </div>
+
+      <div class="jenkins-progress-bar" style="margin-bottom:16px;background:rgba(255,255,255,0.06);height:8px;border-radius:99px;overflow:hidden">
+        <div id="modalProgressBar" class="jenkins-bar-fill running" style="width:10%;height:100%;transition:width 0.3s;background:linear-gradient(90deg, #3b82f6, #10b981)"></div>
+      </div>
+
+      <div id="modalLogBox" style="background:#030712;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;height:280px;overflow-y:auto;color:#cbd5e1;line-height:1.6">
+        <div style="color:#64748b">Inisialisasi Test Engine & API Staging...</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
+        <div id="modalElapsedText" style="font-size:12px;color:var(--text-muted)">Elapsed: 0s</div>
+        <div style="display:flex;gap:10px">
+          <button id="modalCloseBtn" class="btn btn-secondary" onclick="closeTestRunModal()">Tutup</button>
+          <button id="modalRefreshBtn" class="btn btn-success" style="display:none;font-weight:700" onclick="location.reload()">✓ Selesai & Refresh Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
   `;
 
   const scripts = `
   <script>
+    let activeTestSSE = null;
+    let testTimer = null;
+    let testSeconds = 0;
+
+    function openTestRunModal(title) {
+      document.getElementById('modalRunTitle').textContent = title;
+      document.getElementById('modalRunSubtitle').textContent = 'Live SSE Execution Stream';
+      document.getElementById('modalRunBadge').className = 'jenkins-badge yellow';
+      document.getElementById('modalRunBadge').textContent = '#RUNNING';
+      document.getElementById('modalProgressBar').style.width = '15%';
+      document.getElementById('modalLogBox').innerHTML = '<div style="color:#64748b">Menghubungkan ke Test Engine...</div>';
+      document.getElementById('modalRefreshBtn').style.display = 'none';
+      document.getElementById('modalCloseBtn').textContent = 'Batal';
+      document.getElementById('testRunModal').classList.add('active');
+
+      testSeconds = 0;
+      clearInterval(testTimer);
+      testTimer = setInterval(() => {
+        testSeconds++;
+        document.getElementById('modalElapsedText').textContent = 'Elapsed: ' + testSeconds + 's';
+      }, 1000);
+    }
+
+    function closeTestRunModal() {
+      if (activeTestSSE) {
+        activeTestSSE.close();
+        activeTestSSE = null;
+      }
+      clearInterval(testTimer);
+      document.getElementById('testRunModal').classList.remove('active');
+    }
+
+    function runScenarioQuick(name, evt) {
+      if (evt) evt.stopPropagation();
+      openTestRunModal('Skenario: ' + name);
+
+      const logBox = document.getElementById('modalLogBox');
+      const pBar = document.getElementById('modalProgressBar');
+      const badge = document.getElementById('modalRunBadge');
+
+      if (activeTestSSE) activeTestSSE.close();
+      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=engine');
+
+      activeTestSSE.onmessage = function(e) {
+        try {
+          const d = JSON.parse(e.data);
+          const line = document.createElement('div');
+
+          if (d.type === 'step') {
+            line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
+            line.textContent = d.name;
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'progress') {
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'result') {
+            clearInterval(testTimer);
+            pBar.style.width = '100%';
+            badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
+            badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
+            line.style.fontWeight = 'bold';
+            line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
+            line.textContent = '🏁 ' + d.message;
+            document.getElementById('modalCloseBtn').textContent = 'Tutup';
+            document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+            activeTestSSE.close();
+            activeTestSSE = null;
+          } else {
+            line.style.color = '#94a3b8';
+            line.textContent = d.message || JSON.stringify(d);
+          }
+
+          logBox.appendChild(line);
+          logBox.scrollTop = logBox.scrollHeight;
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      activeTestSSE.onerror = function() {
+        clearInterval(testTimer);
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#ERROR';
+        const line = document.createElement('div');
+        line.style.color = '#ef4444';
+        line.textContent = '❌ Koneksi stream terputus.';
+        logBox.appendChild(line);
+        document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+        if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
+      };
+    }
+
+    function runAllScenariosQuick() {
+      openTestRunModal('Full E2E Suite (5 Kepingan Test Bank)');
+
+      const logBox = document.getElementById('modalLogBox');
+      const pBar = document.getElementById('modalProgressBar');
+      const badge = document.getElementById('modalRunBadge');
+
+      if (activeTestSSE) activeTestSSE.close();
+      activeTestSSE = new EventSource('/api/testbank/run-all');
+
+      activeTestSSE.onmessage = function(e) {
+        try {
+          const d = JSON.parse(e.data);
+          const line = document.createElement('div');
+
+          if (d.type === 'step') {
+            line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
+            line.textContent = d.name;
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'progress') {
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'result') {
+            clearInterval(testTimer);
+            pBar.style.width = '100%';
+            badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
+            badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
+            line.style.fontWeight = 'bold';
+            line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
+            line.textContent = '🏁 ' + d.message;
+            document.getElementById('modalCloseBtn').textContent = 'Tutup';
+            document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+            activeTestSSE.close();
+            activeTestSSE = null;
+          } else {
+            line.style.color = '#94a3b8';
+            line.textContent = d.message || JSON.stringify(d);
+          }
+
+          logBox.appendChild(line);
+          logBox.scrollTop = logBox.scrollHeight;
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      activeTestSSE.onerror = function() {
+        clearInterval(testTimer);
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#ERROR';
+        const line = document.createElement('div');
+        line.style.color = '#ef4444';
+        line.textContent = '❌ Koneksi stream terputus.';
+        logBox.appendChild(line);
+        document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+        if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
+      };
+    }
+
     async function createScenarioSubmit() {
       const name = document.getElementById('newScenarioName').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
       if (!name) return alert('Silakan isi nama skenario!');
@@ -1967,15 +2154,15 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a href="/capture?scenario=${encodeURIComponent(scenario)}&target=laptop" class="btn btn-primary btn-sm" title="Capture dari Emulator Laptop">
-          📷 Snap Laptop
+        <button class="btn btn-success btn-sm" onclick="runScenarioQuick('${scenario}', event)" id="btnRunEngine" style="font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(16,185,129,0.3)">
+          ▶ Run Kepingan Ini
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="runAutomation('laptop')" id="btnRunLaptop">
+          📱 Run di Mobile Emulator
+        </button>
+        <a href="/capture?scenario=${encodeURIComponent(scenario)}&target=laptop" class="btn btn-secondary btn-sm" title="Capture dari Emulator Laptop">
+          📷 Snap Emulator
         </a>
-        <button class="btn btn-success btn-sm" onclick="runAutomation('laptop')" id="btnRunLaptop">
-          ▶ Run di Laptop
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="runAutomation('vps')" id="btnRunVps">
-          ▶ Run di VPS
-        </button>
         <a href="/screenshots/${encodeURIComponent(scenario)}/delete" class="btn btn-danger btn-sm" onclick="return confirm('Hapus seluruh skenario ${scenario}?')">
           🗑 Hapus
         </a>
@@ -2072,6 +2259,38 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
   <!-- Zoom Modal -->
   <div id="zoomModal" class="modal-overlay" onclick="this.classList.remove('active')">
     <img id="zoomModalImg" src="" style="max-width:92vw;max-height:92vh;border-radius:12px;box-shadow:0 12px 48px rgba(0,0,0,0.8);object-fit:contain">
+  </div>
+
+  <!-- Live Test Bank Execution Modal -->
+  <div id="testRunModal" class="modal-overlay">
+    <div class="modal" style="max-width:760px;width:95%;background:#0b1120;border:1px solid var(--border);box-shadow:0 25px 50px -12px rgba(0,0,0,0.7)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">⚡</span>
+          <div>
+            <h2 id="modalRunTitle" style="font-size:18px;font-weight:800;margin:0;color:#fff">Menjalankan Pengujian...</h2>
+            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Live Test Bank Engine & Staging API</div>
+          </div>
+        </div>
+        <span id="modalRunBadge" class="jenkins-badge yellow" style="font-size:12px;padding:4px 10px">#RUNNING</span>
+      </div>
+
+      <div class="jenkins-progress-bar" style="margin-bottom:16px;background:rgba(255,255,255,0.06);height:8px;border-radius:99px;overflow:hidden">
+        <div id="modalProgressBar" class="jenkins-bar-fill running" style="width:10%;height:100%;transition:width 0.3s;background:linear-gradient(90deg, #3b82f6, #10b981)"></div>
+      </div>
+
+      <div id="modalLogBox" style="background:#030712;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;height:280px;overflow-y:auto;color:#cbd5e1;line-height:1.6">
+        <div style="color:#64748b">Inisialisasi Test Engine & API Staging...</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
+        <div id="modalElapsedText" style="font-size:12px;color:var(--text-muted)">Elapsed: 0s</div>
+        <div style="display:flex;gap:10px">
+          <button id="modalCloseBtn" class="btn btn-secondary" onclick="closeTestRunModal()">Tutup</button>
+          <button id="modalRefreshBtn" class="btn btn-success" style="display:none;font-weight:700" onclick="location.reload()">✓ Selesai & Refresh Data</button>
+        </div>
+      </div>
+    </div>
   </div>
   `;
 
@@ -2309,6 +2528,97 @@ export function renderScenarioDetailView({ scenario, caps = [], md = '', yaml = 
       } catch (e) {
         location.reload();
       }
+    }
+
+    let activeTestSSE = null;
+    let testTimer = null;
+    let testSeconds = 0;
+
+    function openTestRunModal(title) {
+      document.getElementById('modalRunTitle').textContent = title;
+      document.getElementById('modalRunSubtitle').textContent = 'Live SSE Execution Stream';
+      document.getElementById('modalRunBadge').className = 'jenkins-badge yellow';
+      document.getElementById('modalRunBadge').textContent = '#RUNNING';
+      document.getElementById('modalProgressBar').style.width = '15%';
+      document.getElementById('modalLogBox').innerHTML = '<div style="color:#64748b">Menghubungkan ke Test Engine...</div>';
+      document.getElementById('modalRefreshBtn').style.display = 'none';
+      document.getElementById('modalCloseBtn').textContent = 'Batal';
+      document.getElementById('testRunModal').classList.add('active');
+
+      testSeconds = 0;
+      clearInterval(testTimer);
+      testTimer = setInterval(() => {
+        testSeconds++;
+        document.getElementById('modalElapsedText').textContent = 'Elapsed: ' + testSeconds + 's';
+      }, 1000);
+    }
+
+    function closeTestRunModal() {
+      if (activeTestSSE) {
+        activeTestSSE.close();
+        activeTestSSE = null;
+      }
+      clearInterval(testTimer);
+      document.getElementById('testRunModal').classList.remove('active');
+    }
+
+    function runScenarioQuick(name, evt) {
+      if (evt) evt.stopPropagation();
+      openTestRunModal('Skenario: ' + name);
+
+      const logBox = document.getElementById('modalLogBox');
+      const pBar = document.getElementById('modalProgressBar');
+      const badge = document.getElementById('modalRunBadge');
+
+      if (activeTestSSE) activeTestSSE.close();
+      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=engine');
+
+      activeTestSSE.onmessage = function(e) {
+        try {
+          const d = JSON.parse(e.data);
+          const line = document.createElement('div');
+
+          if (d.type === 'step') {
+            line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
+            line.textContent = d.name;
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'progress') {
+            if (d.percent) pBar.style.width = d.percent + '%';
+          } else if (d.type === 'result') {
+            clearInterval(testTimer);
+            pBar.style.width = '100%';
+            badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
+            badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
+            line.style.fontWeight = 'bold';
+            line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
+            line.textContent = '🏁 ' + d.message;
+            document.getElementById('modalCloseBtn').textContent = 'Tutup';
+            document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+            activeTestSSE.close();
+            activeTestSSE = null;
+          } else {
+            line.style.color = '#94a3b8';
+            line.textContent = d.message || JSON.stringify(d);
+          }
+
+          logBox.appendChild(line);
+          logBox.scrollTop = logBox.scrollHeight;
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      activeTestSSE.onerror = function() {
+        clearInterval(testTimer);
+        badge.className = 'jenkins-badge red';
+        badge.textContent = '#ERROR';
+        const line = document.createElement('div');
+        line.style.color = '#ef4444';
+        line.textContent = '❌ Koneksi stream terputus.';
+        logBox.appendChild(line);
+        document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+        if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
+      };
     }
   </script>
   `;
