@@ -1842,25 +1842,58 @@ export function renderApksView({ builds = [] } = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TEST BANK VIEW (GET /screenshots)
+// TEST BANK VIEW (GET /screenshots) - JENKINS / ALLURE TESTOPS STANDARD
 // ─────────────────────────────────────────────────────────────
-export function renderTestBankView({ scenarios = [] }) {
+export function renderTestBankView({ scenarios = [], runs = [], metrics = null, runner = null }) {
+  const totalRuns = metrics?.total ?? runs.length;
+  const passedRuns = metrics?.passed ?? runs.filter(r => r.status === 'pass').length;
+  const failedRuns = metrics?.failed ?? runs.filter(r => r.status === 'fail').length;
+  const passRate = metrics?.passRate ?? (totalRuns > 0 ? Math.round((passedRuns / totalRuns) * 100) : 100);
+  const avgDuration = metrics?.avgDuration ?? (totalRuns > 0 ? (runs.reduce((acc, r) => acc + (parseFloat(r.duration) || 0), 0) / totalRuns).toFixed(1) : '12.0');
+  const isRunnerOnline = !!runner?.online;
+  const runnerDevice = runner?.device || 'emulator-5554';
+
+  // Scenario Cards HTML
   const cardsHtml = scenarios.map(s => {
-    const statusColor = s.status === 'pass' ? '#10b981' : s.status === 'fail' ? '#ef4444' : '#f59e0b';
-    const statusIcon = s.status === 'pass' ? '✅' : s.status === 'fail' ? '❌' : '⏳';
-    const lastTime = s.captures > 0 && s.lastCapture ? s.lastCapture.slice(0, 16).replace('T', ' ') : '-';
+    const isPass = s.status === 'pass';
+    const isFail = s.status === 'fail';
+    const statusColor = isPass ? '#10b981' : isFail ? '#ef4444' : '#f59e0b';
+    const statusIcon = isPass ? '☀️' : isFail ? '🌧️' : '⏳';
+    const statusText = isPass ? 'PASSED' : isFail ? 'FAILED' : 'PENDING';
+    const lastTime = s.lastCapture ? s.lastCapture.slice(0, 19).replace('T', ' ') : '-';
+    const durText = s.lastDuration ? `⏱️ ${s.lastDuration}` : '⏱️ ~12s';
+
     return `
-      <div class="card" style="display:flex;align-items:center;gap:18px;padding:18px 22px;transition:all 0.2s">
-        <div style="width:48px;height:48px;border-radius:12px;background:${statusColor}18;border:1px solid ${statusColor}35;display:flex;align-items:center;justify-content:center;font-size:22px;color:${statusColor};flex-shrink:0">
-          ${statusIcon}
+      <div class="card scenario-card" data-scenario="${s.name}" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;background:rgba(17,24,39,0.75);border:1px solid ${statusColor}35;border-radius:12px;transition:all 0.25s;box-shadow:0 4px 20px rgba(0,0,0,0.25)">
+        <div style="display:flex;align-items:center;gap:18px;flex:1">
+          <div style="width:50px;height:50px;border-radius:12px;background:${statusColor}15;border:1px solid ${statusColor}40;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">
+            ${statusIcon}
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+              <a href="/screenshots/${encodeURIComponent(s.name)}" style="font-weight:800;font-size:16px;color:#fff;text-decoration:none">
+                ${s.name} ${s.hasAutomation ? '<span style="font-size:11px;background:rgba(14,165,233,0.15);color:#38bdf8;padding:2px 7px;border-radius:6px;border:1px solid rgba(14,165,233,0.3);margin-left:6px">AUTOMATED SOM</span>' : ''}
+              </a>
+              <span id="badge-status-${s.name}" class="jenkins-badge ${isPass ? 'green' : isFail ? 'red' : 'yellow'}" style="font-size:11px;padding:3px 9px;border-radius:6px;font-weight:700">
+                ${statusText}
+              </span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <span>📸 <b>${s.captures}</b> screenshots tersimpan</span>
+              <span>•</span>
+              <span id="badge-dur-${s.name}">${durText}</span>
+              <span>•</span>
+              <span id="badge-time-${s.name}">Terakhir: ${lastTime}</span>
+            </div>
+          </div>
         </div>
-        <a href="/screenshots/${encodeURIComponent(s.name)}" style="text-decoration:none;color:inherit;flex:1">
-          <div style="font-weight:700;font-size:16px;color:#fff;margin-bottom:3px">${s.name} ${s.hasAutomation ? '🤖' : ''}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${s.captures} screenshot • <span style="color:${statusColor};font-weight:700">${s.status.toUpperCase()}</span> • ${lastTime}</div>
-        </a>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button onclick="runScenarioQuick('${s.name}', event)" class="btn btn-success btn-sm" style="display:flex;align-items:center;gap:6px;font-weight:700;padding:8px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(16,185,129,0.25)">
+
+        <div style="display:flex;gap:10px;align-items:center">
+          <button onclick="runScenarioQuick('${s.name}', event)" class="btn btn-success btn-sm" style="display:flex;align-items:center;gap:6px;font-weight:700;padding:8px 16px;border-radius:8px;box-shadow:0 2px 10px rgba(16,185,129,0.3)">
             ▶ Run Kepingan
+          </button>
+          <button onclick="openScenarioReportModal('${s.name}', '${s.lastRunId || ''}')" class="btn btn-secondary btn-sm" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px" title="Lihat Report & Validasi Layar">
+            🔍 Lihat Report
           </button>
           <a href="/screenshots/${encodeURIComponent(s.name)}" class="btn btn-secondary btn-sm" style="text-decoration:none;padding:8px 12px;border-radius:8px">Detail ›</a>
         </div>
@@ -1868,16 +1901,68 @@ export function renderTestBankView({ scenarios = [] }) {
     `;
   }).join('');
 
+  // History Table Rows
+  const historyRowsHtml = runs.map((r, idx) => {
+    const isPass = r.status === 'pass';
+    const isFail = r.status === 'fail';
+    const statusPill = isPass ? '<span class="jenkins-badge green">✓ SUCCESS</span>' : isFail ? '<span class="jenkins-badge red">✗ FAILURE</span>' : '<span class="jenkins-badge yellow">⏳ RUNNING</span>';
+    const stepsPill = `${r.stepsPassed ?? r.steps?.length ?? 0}/${r.stepsTotal ?? r.steps?.length ?? 5} Steps`;
+    const timeStr = r.timeStr || (r.timestamp ? r.timestamp.slice(0, 19).replace('T', ' ') : '-');
+    const durStr = r.duration ? `${r.duration}s` : '-';
+
+    return `
+      <tr class="history-row" data-status="${r.status}" data-scenario="${r.scenario || ''}" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.2s">
+        <td style="padding:14px 16px;font-weight:700">
+          <a href="javascript:void(0)" onclick="openRunReportModal('${r.runId}')" style="color:#38bdf8;text-decoration:none">
+            #${r.runId || ('RUN-' + (runs.length - idx))}
+          </a>
+        </td>
+        <td style="padding:14px 16px;font-size:18px">${r.weather || (isPass ? '☀️' : isFail ? '🌧️' : '⏳')}</td>
+        <td style="padding:14px 16px">
+          <div style="font-weight:700;color:#fff">${r.scenarioTitle || r.scenario || 'Full E2E Suite'}</div>
+          <div style="font-size:11px;color:var(--text-muted)">Target: com.bukainjalan.app</div>
+        </td>
+        <td style="padding:14px 16px">${statusPill}</td>
+        <td style="padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#cbd5e1">⏱️ ${durStr}</td>
+        <td style="padding:14px 16px">
+          <span style="font-size:12px;background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:6px;border:1px solid var(--border)">${stepsPill}</span>
+        </td>
+        <td style="padding:14px 16px;font-size:12px;color:var(--text-muted)">${timeStr}</td>
+        <td style="padding:14px 16px">
+          <span style="font-size:11px;color:#94a3b8;background:rgba(0,0,0,0.3);padding:3px 8px;border-radius:6px">📱 ${r.device || 'emulator-5554'}</span>
+        </td>
+        <td style="padding:14px 16px">
+          <div style="display:flex;gap:6px">
+            <button onclick="openRunReportModal('${r.runId}')" class="btn btn-secondary btn-sm" style="padding:5px 10px;font-size:11px">
+              🔍 Report
+            </button>
+            <button onclick="runScenarioQuick('${r.scenario || 'all'}', event)" class="btn btn-secondary btn-sm" style="padding:5px 9px;font-size:11px" title="Re-run">
+              ↻
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
   const body = `
-  <div class="container" style="max-width:960px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+  <div class="container" style="max-width:1200px">
+    
+    <!-- Top Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px">
       <div>
-        <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.5px">🧪 Test Bank & Automation</h1>
-        <p style="color:var(--text-muted);font-size:14px">Kumpulan skenario pengujian modular & live pipeline BukainJalan.</p>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.5px">🧪 Test Bank & Automation Pipeline</h1>
+          <span class="jenkins-badge green" style="font-size:11px;padding:3px 8px">ENTERPRISE QA</span>
+        </div>
+        <p style="color:var(--text-muted);font-size:14px">Modular E2E QA Automation, Quality Gates, & Build Telemetry • BukainJalan Mobile App.</p>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button onclick="runAllScenariosQuick()" class="btn btn-success" style="font-weight:800;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg, #10b981 0%, #059669 100%);box-shadow:0 4px 14px rgba(16,185,129,0.35);padding:10px 18px;border-radius:9px">
           ▶ Run Semua Kepingan (Full E2E)
+        </button>
+        <button onclick="syncLiveData(true)" class="btn btn-secondary" style="border-radius:9px;padding:10px 14px" title="Sinkronisasi Data Real-Time">
+          ↻ Sync Data
         </button>
         <button onclick="document.getElementById('newScenarioModal').classList.add('active')" class="btn btn-secondary" style="border-radius:9px;padding:10px 16px">
           + Scenario Baru
@@ -1885,14 +1970,194 @@ export function renderTestBankView({ scenarios = [] }) {
       </div>
     </div>
 
-    ${scenarios.length > 0 ? `<div style="display:flex;flex-direction:column;gap:12px">${cardsHtml}</div>` : `
-      <div class="card" style="text-align:center;padding:60px 20px">
-        <div style="font-size:48px;margin-bottom:12px">🧪</div>
-        <h3 style="font-size:18px;font-weight:700;margin-bottom:6px">Belum Ada Skenario Testing</h3>
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Buat skenario pertama untuk mulai menguji dan mendokumentasikan fitur aplikasi.</p>
-        <button onclick="document.getElementById('newScenarioModal').classList.add('active')" class="btn btn-primary">+ Buat Skenario Baru</button>
+    <!-- Executive Quality Gate KPI Bar (Jenkins / Allure Standard) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));gap:16px;margin-bottom:28px">
+      
+      <!-- KPI 1: Total Runs -->
+      <div class="card" style="padding:18px 20px;border-left:4px solid #0ea5e9;background:rgba(17,24,39,0.7)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px">Total Eksekusi Uji</span>
+          <span style="font-size:20px">📊</span>
+        </div>
+        <div id="kpi-total-runs" style="font-size:28px;font-weight:800;color:#fff">${totalRuns} <span style="font-size:14px;font-weight:500;color:var(--text-muted)">Builds</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Riwayat eksekusi kepingan & full suite</div>
       </div>
-    `}
+
+      <!-- KPI 2: Quality Gate Pass Rate -->
+      <div class="card" style="padding:18px 20px;border-left:4px solid #10b981;background:rgba(17,24,39,0.7)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px">Quality Gate Pass Rate</span>
+          <span style="font-size:20px">🛡️</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div id="kpi-pass-rate" style="font-size:28px;font-weight:800;color:#10b981">${passRate}%</div>
+          <span style="font-size:12px;color:#10b981;font-weight:700">(${passedRuns} Pass / ${failedRuns} Fail)</span>
+        </div>
+        <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:8px;overflow:hidden">
+          <div id="kpi-progress-bar" style="width:${passRate}%;height:100%;background:linear-gradient(90deg, #10b981, #059669)"></div>
+        </div>
+      </div>
+
+      <!-- KPI 3: Avg Duration -->
+      <div class="card" style="padding:18px 20px;border-left:4px solid #8b5cf6;background:rgba(17,24,39,0.7)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px">Rata-Rata Durasi</span>
+          <span style="font-size:20px">⚡</span>
+        </div>
+        <div id="kpi-avg-duration" style="font-size:28px;font-weight:800;color:#fff">${avgDuration}s</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Waktu eksekusi rata-rata per kepingan</div>
+      </div>
+
+      <!-- KPI 4: Active Runner & Device -->
+      <div class="card" style="padding:18px 20px;border-left:4px solid ${isRunnerOnline ? '#10b981' : '#f59e0b'};background:rgba(17,24,39,0.7)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px">Node Perangkat Aktif</span>
+          <span style="font-size:20px">📱</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="pulse-dot online"></span>
+          <span style="font-size:18px;font-weight:700;color:#fff">${runnerDevice}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Android 14 • 1080x2280 • ADB Local Bridge</div>
+      </div>
+
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <div style="display:flex;gap:12px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:20px">
+      <button id="navTabScenarios" onclick="switchMainTab('scenarios')" class="btn btn-primary" style="font-weight:700;border-radius:9px;display:flex;align-items:center;gap:8px">
+        🧪 Skenario Test Bank (${scenarios.length})
+      </button>
+      <button id="navTabHistory" onclick="switchMainTab('history')" class="btn btn-secondary" style="font-weight:700;border-radius:9px;display:flex;align-items:center;gap:8px">
+        📋 Riwayat Test Runs (Build History) <span id="tabHistoryCount" style="font-size:11px;background:rgba(255,255,255,0.12);padding:2px 7px;border-radius:10px">${runs.length}</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: MODULAR SCENARIOS VIEW -->
+    <div id="contentTabScenarios" style="display:flex;flex-direction:column;gap:14px">
+      ${scenarios.length > 0 ? cardsHtml : `
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:12px">🧪</div>
+          <h3 style="font-size:18px;font-weight:700;margin-bottom:6px">Belum Ada Skenario Testing</h3>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Buat skenario pertama untuk mulai menguji dan mendokumentasikan fitur aplikasi.</p>
+          <button onclick="document.getElementById('newScenarioModal').classList.add('active')" class="btn btn-primary">+ Buat Skenario Baru</button>
+        </div>
+      `}
+    </div>
+
+    <!-- TAB 2: BUILD HISTORY TABLE (JENKINS STANDARD) -->
+    <div id="contentTabHistory" style="display:none;flex-direction:column;gap:16px">
+      
+      <!-- Table Filter Bar -->
+      <div class="card" style="padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-weight:700;color:var(--text-muted)">Filter Status:</span>
+          <button onclick="filterHistoryTable('all')" class="btn btn-secondary btn-sm btn-filter active" id="btnFilterAll">Semua (${runs.length})</button>
+          <button onclick="filterHistoryTable('pass')" class="btn btn-secondary btn-sm btn-filter" id="btnFilterPass">✅ Passed (${passedRuns})</button>
+          <button onclick="filterHistoryTable('fail')" class="btn btn-secondary btn-sm btn-filter" id="btnFilterFail">❌ Failed (${failedRuns})</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="text" id="historySearchInput" placeholder="Cari skenario atau build ID..." onkeyup="searchHistoryTable(this.value)" style="background:#0b1120;border:1px solid var(--border);color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;outline:none;width:240px">
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
+            <thead>
+              <tr style="background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:0.5px">
+                <th style="padding:14px 16px">#Build</th>
+                <th style="padding:14px 16px">W</th>
+                <th style="padding:14px 16px">Skenario Target</th>
+                <th style="padding:14px 16px">Status</th>
+                <th style="padding:14px 16px">Durasi</th>
+                <th style="padding:14px 16px">Validasi Steps</th>
+                <th style="padding:14px 16px">Waktu Eksekusi</th>
+                <th style="padding:14px 16px">Perangkat Node</th>
+                <th style="padding:14px 16px">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              ${historyRowsHtml || '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Belum ada riwayat build test run.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- INTERACTIVE REPORT CAPTURE MODAL (QUALITY GATE REPORT) -->
+  <div id="reportCaptureModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal" style="max-width:960px;width:95%;background:#0b1120;border:1px solid var(--border);box-shadow:0 25px 60px -10px rgba(0,0,0,0.85);max-height:90vh;display:flex;flex-direction:column;padding:24px">
+      
+      <!-- Report Header -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <h2 id="reportModalTitle" style="font-size:20px;font-weight:800;color:#fff">Quality Gate & Test Report</h2>
+            <span id="reportModalVerdict" class="jenkins-badge green" style="font-size:12px;padding:4px 10px">✓ PASSED</span>
+          </div>
+          <div id="reportModalSubtitle" style="font-size:12px;color:var(--text-muted)">Build details and step screenshots validation</div>
+        </div>
+        <button onclick="document.getElementById('reportCaptureModal').classList.remove('active')" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">✕</button>
+      </div>
+
+      <!-- Report Metadata Strip -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-bottom:18px;background:rgba(255,255,255,0.02);padding:12px 16px;border-radius:10px;border:1px solid var(--border)">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted)">Total Durasi</div>
+          <div id="reportMetaDur" style="font-weight:700;color:#fff;font-size:14px">⏱️ 0s</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted)">Validasi Steps</div>
+          <div id="reportMetaSteps" style="font-weight:700;color:#10b981;font-size:14px">5/5 Passed</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted)">Perangkat Eksekutor</div>
+          <div id="reportMetaDevice" style="font-weight:700;color:#fff;font-size:14px">emulator-5554</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted)">Waktu Eksekusi</div>
+          <div id="reportMetaTime" style="font-weight:700;color:#fff;font-size:14px">-</div>
+        </div>
+      </div>
+
+      <!-- Report Tabs -->
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button id="tabBtnReportSteps" onclick="switchReportTab('steps')" class="btn btn-primary btn-sm" style="font-weight:700;border-radius:8px">
+          📸 Tangkapan Layar Tiap Step
+        </button>
+        <button id="tabBtnReportLogs" onclick="switchReportTab('logs')" class="btn btn-secondary btn-sm" style="border-radius:8px">
+          📜 Telemetri & Console Log
+        </button>
+      </div>
+
+      <!-- Report Tab 1: Step Captures Gallery -->
+      <div id="reportContentSteps" style="overflow-y:auto;flex:1;padding-right:6px">
+        <div id="reportStepsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:16px">
+          <!-- Step cards inserted dynamically -->
+        </div>
+      </div>
+
+      <!-- Report Tab 2: Console Log -->
+      <div id="reportContentLogs" style="display:none;overflow-y:auto;flex:1">
+        <pre id="reportLogsPre" style="background:#030712;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#cbd5e1;line-height:1.6;white-space:pre-wrap;height:100%"></pre>
+      </div>
+
+      <!-- Report Footer -->
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
+        <button class="btn btn-secondary" onclick="document.getElementById('reportCaptureModal').classList.remove('active')">Tutup</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Zoom Modal -->
+  <div id="zoomModal" class="modal-overlay" onclick="this.classList.remove('active')">
+    <img id="zoomModalImg" src="" style="max-width:92vw;max-height:92vh;border-radius:12px;box-shadow:0 12px 48px rgba(0,0,0,0.8);object-fit:contain">
   </div>
 
   <!-- New Scenario Modal -->
@@ -1916,7 +2181,7 @@ export function renderTestBankView({ scenarios = [] }) {
           <span style="font-size:22px">⚡</span>
           <div>
             <h2 id="modalRunTitle" style="font-size:18px;font-weight:800;margin:0;color:#fff">Menjalankan Pengujian...</h2>
-            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Connecting to Test Bank Engine...</div>
+            <div id="modalRunSubtitle" style="font-size:12px;color:var(--text-muted)">Live Emulator ADB Pipeline Runner</div>
           </div>
         </div>
         <span id="modalRunBadge" class="jenkins-badge yellow" style="font-size:12px;padding:4px 10px">#RUNNING</span>
@@ -1927,14 +2192,15 @@ export function renderTestBankView({ scenarios = [] }) {
       </div>
 
       <div id="modalLogBox" style="background:#030712;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;height:280px;overflow-y:auto;color:#cbd5e1;line-height:1.6">
-        <div style="color:#64748b">Inisialisasi Test Engine & API Staging...</div>
+        <div style="color:#64748b">Menghubungkan ke Android Emulator via Runner...</div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">
         <div id="modalElapsedText" style="font-size:12px;color:var(--text-muted)">Elapsed: 0s</div>
         <div style="display:flex;gap:10px">
           <button id="modalCloseBtn" class="btn btn-secondary" onclick="closeTestRunModal()">Tutup</button>
-          <button id="modalRefreshBtn" class="btn btn-success" style="display:none;font-weight:700" onclick="location.reload()">✓ Selesai & Refresh Data</button>
+          <button id="modalViewReportBtn" class="btn btn-primary" style="display:none;font-weight:700" onclick="viewLatestReportFromModal()">🔍 Lihat Report Capture</button>
+          <button id="modalRefreshBtn" class="btn btn-success" style="display:none;font-weight:700" onclick="syncLiveData(true);closeTestRunModal()">✓ Selesai & Refresh Data</button>
         </div>
       </div>
     </div>
@@ -1946,6 +2212,75 @@ export function renderTestBankView({ scenarios = [] }) {
     let activeTestSSE = null;
     let testTimer = null;
     let testSeconds = 0;
+    let lastFinishedScenario = null;
+    let lastFinishedRunId = null;
+
+    function switchMainTab(tab) {
+      const btnScenarios = document.getElementById('navTabScenarios');
+      const btnHistory = document.getElementById('navTabHistory');
+      const contentScenarios = document.getElementById('contentTabScenarios');
+      const contentHistory = document.getElementById('contentTabHistory');
+
+      if (tab === 'scenarios') {
+        btnScenarios.className = 'btn btn-primary';
+        btnHistory.className = 'btn btn-secondary';
+        contentScenarios.style.display = 'flex';
+        contentHistory.style.display = 'none';
+      } else {
+        btnScenarios.className = 'btn btn-secondary';
+        btnHistory.className = 'btn btn-primary';
+        contentScenarios.style.display = 'none';
+        contentHistory.style.display = 'flex';
+      }
+    }
+
+    function switchReportTab(tab) {
+      const btnSteps = document.getElementById('tabBtnReportSteps');
+      const btnLogs = document.getElementById('tabBtnReportLogs');
+      const contentSteps = document.getElementById('reportContentSteps');
+      const contentLogs = document.getElementById('reportContentLogs');
+
+      if (tab === 'steps') {
+        btnSteps.className = 'btn btn-primary btn-sm';
+        btnLogs.className = 'btn btn-secondary btn-sm';
+        contentSteps.style.display = 'block';
+        contentLogs.style.display = 'none';
+      } else {
+        btnSteps.className = 'btn btn-secondary btn-sm';
+        btnLogs.className = 'btn btn-primary btn-sm';
+        contentSteps.style.display = 'none';
+        contentLogs.style.display = 'block';
+      }
+    }
+
+    function filterHistoryTable(status) {
+      document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+      if (status === 'all') document.getElementById('btnFilterAll').classList.add('active');
+      if (status === 'pass') document.getElementById('btnFilterPass').classList.add('active');
+      if (status === 'fail') document.getElementById('btnFilterFail').classList.add('active');
+
+      document.querySelectorAll('.history-row').forEach(row => {
+        if (status === 'all' || row.getAttribute('data-status') === status) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    function searchHistoryTable(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('.history-row').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function openZoomModal(src) {
+      const m = document.getElementById('zoomModal');
+      document.getElementById('zoomModalImg').src = src;
+      m.classList.add('active');
+    }
 
     function openTestRunModal(title) {
       document.getElementById('modalRunTitle').textContent = title;
@@ -1955,6 +2290,7 @@ export function renderTestBankView({ scenarios = [] }) {
       document.getElementById('modalProgressBar').style.width = '15%';
       document.getElementById('modalLogBox').innerHTML = '<div style="color:#64748b">Menghubungkan ke Test Engine...</div>';
       document.getElementById('modalRefreshBtn').style.display = 'none';
+      document.getElementById('modalViewReportBtn').style.display = 'none';
       document.getElementById('modalCloseBtn').textContent = 'Batal';
       document.getElementById('testRunModal').classList.add('active');
 
@@ -1977,6 +2313,7 @@ export function renderTestBankView({ scenarios = [] }) {
 
     function runScenarioQuick(name, evt) {
       if (evt) evt.stopPropagation();
+      lastFinishedScenario = name;
       openTestRunModal('Skenario: ' + name);
 
       const logBox = document.getElementById('modalLogBox');
@@ -2011,7 +2348,9 @@ export function renderTestBankView({ scenarios = [] }) {
             line.textContent = '🏁 ' + (d.message || 'Selesai');
             document.getElementById('modalCloseBtn').textContent = 'Tutup';
             document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+            document.getElementById('modalViewReportBtn').style.display = 'inline-block';
             if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
+            syncLiveData(false);
           } else {
             line.style.color = '#94a3b8';
             line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
@@ -2073,7 +2412,9 @@ export function renderTestBankView({ scenarios = [] }) {
             line.textContent = '🏁 ' + (d.message || 'Selesai');
             document.getElementById('modalCloseBtn').textContent = 'Tutup';
             document.getElementById('modalRefreshBtn').style.display = 'inline-block';
+            document.getElementById('modalViewReportBtn').style.display = 'inline-block';
             if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
+            syncLiveData(false);
           } else {
             line.style.color = '#94a3b8';
             line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
@@ -2100,6 +2441,143 @@ export function renderTestBankView({ scenarios = [] }) {
       };
     }
 
+    async function syncLiveData(showAlert = false) {
+      try {
+        const res = await fetch('/api/test-runs');
+        const data = await res.json();
+        if (!data || !data.ok) return;
+
+        // Update KPI metrics
+        if (data.metrics) {
+          document.getElementById('kpi-total-runs').innerHTML = data.metrics.total + ' <span style="font-size:14px;font-weight:500;color:var(--text-muted)">Builds</span>';
+          document.getElementById('kpi-pass-rate').textContent = data.metrics.passRate + '%';
+          document.getElementById('kpi-progress-bar').style.width = data.metrics.passRate + '%';
+          document.getElementById('kpi-avg-duration').textContent = data.metrics.avgDuration + 's';
+        }
+
+        // Update Scenario Cards status
+        const runs = data.runs || [];
+        runs.forEach(r => {
+          if (!r.scenario) return;
+          const badge = document.getElementById('badge-status-' + r.scenario);
+          if (badge) {
+            badge.className = 'jenkins-badge ' + (r.status === 'pass' ? 'green' : r.status === 'fail' ? 'red' : 'yellow');
+            badge.textContent = (r.status || 'pending').toUpperCase();
+          }
+          const durBadge = document.getElementById('badge-dur-' + r.scenario);
+          if (durBadge && r.duration) {
+            durBadge.textContent = '⏱️ ' + r.duration + 's';
+          }
+          const timeBadge = document.getElementById('badge-time-' + r.scenario);
+          if (timeBadge && (r.timeStr || r.timestamp)) {
+            timeBadge.textContent = 'Terakhir: ' + (r.timeStr || r.timestamp.slice(0, 19).replace('T', ' '));
+          }
+        });
+
+        if (showAlert) alert('Data telemetri & build history berhasil disinkronkan!');
+      } catch (err) {
+        console.warn('Gagal sync live data:', err);
+      }
+    }
+
+    async function openRunReportModal(runId) {
+      try {
+        const res = await fetch('/api/test-runs/' + encodeURIComponent(runId));
+        const data = await res.json();
+        if (!data || !data.ok || !data.run) {
+          return alert('Data run #' + runId + ' tidak ditemukan!');
+        }
+        renderReportDetails(data.run);
+      } catch (err) {
+        alert('Gagal mengambil detail report: ' + err.message);
+      }
+    }
+
+    async function openScenarioReportModal(scenarioName, lastRunId) {
+      if (lastRunId) {
+        return openRunReportModal(lastRunId);
+      }
+      try {
+        const res = await fetch('/api/test-runs');
+        const data = await res.json();
+        const runs = data.runs || [];
+        const match = runs.find(r => r.scenario === scenarioName);
+        if (match) {
+          renderReportDetails(match);
+        } else {
+          location.href = '/screenshots/' + encodeURIComponent(scenarioName);
+        }
+      } catch (e) {
+        location.href = '/screenshots/' + encodeURIComponent(scenarioName);
+      }
+    }
+
+    function viewLatestReportFromModal() {
+      closeTestRunModal();
+      if (lastFinishedScenario) {
+        openScenarioReportModal(lastFinishedScenario, null);
+      }
+    }
+
+    function renderReportDetails(run) {
+      const modal = document.getElementById('reportCaptureModal');
+      const isPass = run.status === 'pass';
+      const isFail = run.status === 'fail';
+
+      document.getElementById('reportModalTitle').textContent = 'Quality Gate & Test Report: ' + (run.scenarioTitle || run.scenario || run.runId);
+      const verdict = document.getElementById('reportModalVerdict');
+      verdict.className = 'jenkins-badge ' + (isPass ? 'green' : isFail ? 'red' : 'yellow');
+      verdict.textContent = isPass ? '✓ QUALITY GATE: PASSED' : isFail ? '✗ QUALITY GATE: FAILED' : '⏳ RUNNING';
+
+      document.getElementById('reportModalSubtitle').textContent = 'Build ID: #' + (run.runId || '-') + ' • Target: com.bukainjalan.app • Evaluated via ADB local bridge';
+      document.getElementById('reportMetaDur').textContent = '⏱️ ' + (run.duration ? run.duration + 's' : '-');
+      document.getElementById('reportMetaSteps').textContent = (run.stepsPassed || run.steps?.length || 0) + '/' + (run.stepsTotal || run.steps?.length || 5) + ' Passed';
+      document.getElementById('reportMetaDevice').textContent = '📱 ' + (run.device || 'emulator-5554');
+      document.getElementById('reportMetaTime').textContent = run.timeStr || run.timestamp || '-';
+
+      // Render Steps Grid
+      const grid = document.getElementById('reportStepsGrid');
+      grid.innerHTML = '';
+      const steps = run.steps || [];
+
+      if (steps.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted);padding:30px;text-align:center;grid-column:1/-1">Belum ada tangkapan layar step tersimpan untuk build ini.</div>';
+      } else {
+        steps.forEach(st => {
+          const card = document.createElement('div');
+          card.style.background = 'rgba(255,255,255,0.03)';
+          card.style.border = '1px solid var(--border)';
+          card.style.borderRadius = '10px';
+          card.style.overflow = 'hidden';
+
+          const imgUrl = st.screenshotUrl || ('/screenshots/' + encodeURIComponent(run.scenario) + '/' + encodeURIComponent(st.filename || 'latest.png'));
+          const sColor = st.status === 'pass' ? '#10b981' : '#ef4444';
+
+          card.innerHTML = \`
+            <div style="padding:10px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;font-weight:700;color:#fff">Step \${st.stepIndex}/\${st.total || steps.length}: \${st.name || ''}</span>
+              <span style="font-size:10px;font-weight:700;color:\${sColor};background:\${sColor}18;padding:2px 7px;border-radius:6px;border:1px solid \${sColor}30">\${(st.status || 'pass').toUpperCase()}</span>
+            </div>
+            <div style="cursor:zoom-in;background:#030712;display:flex;align-items:center;justify-content:center" onclick="openZoomModal('\${imgUrl}')">
+              <img src="\${imgUrl}" loading="lazy" style="width:100%;aspect-ratio:411/731;object-fit:cover;display:block">
+            </div>
+            <div style="padding:8px 12px;font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between">
+              <span>\${st.filename || '-'}</span>
+              <span>\${st.duration ? '⏱️ ' + st.duration + 's' : ''}</span>
+            </div>
+          \`;
+          grid.appendChild(card);
+        });
+      }
+
+      // Render Logs
+      const logsPre = document.getElementById('reportLogsPre');
+      logsPre.textContent = (run.logs && run.logs.length > 0) ? run.logs.join('\\n') : (run.summaryMessage || 'Tidak ada log telemetri.');
+
+      switchReportTab('steps');
+      modal.classList.add('active');
+    }
+
     async function createScenarioSubmit() {
       const name = document.getElementById('newScenarioName').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
       if (!name) return alert('Silakan isi nama skenario!');
@@ -2117,7 +2595,7 @@ export function renderTestBankView({ scenarios = [] }) {
   `;
 
   return renderBaseLayout({
-    title: 'Test Bank',
+    title: 'Test Bank & Pipeline Quality Gate',
     activePage: 'testbank',
     body,
     scripts

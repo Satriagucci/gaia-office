@@ -30,8 +30,9 @@ export async function run({ driver, detector, reporter }) {
 
   // Step 2: Cek State Pengguna (Kondisi 2 & 3: Pastikan Guest Mode / Logout jika sudah login)
   const authState = await home.ensureGuestState()
-  // Buka Auth Sheet dari Tab Profil
-  await home.openProfilTab()
+  if (!authState.sheetAlreadyOpen) {
+    await home.openProfilTab()
+  }
   const authVal = await auth.validateReady(20)
   await auth.snap(2, 5, `Mode Tamu Aktif & Sheet Autentikasi Siap (${authVal.duration}s)`, '01_auth_sheet.png', authVal.duration)
 

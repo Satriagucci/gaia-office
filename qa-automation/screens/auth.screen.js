@@ -14,7 +14,11 @@ export class AuthSheetScreen extends BaseScreen {
   }
 
   async tapDaftarWithEmail() {
-    this.reporter.log('Memilih opsi "Daftar dengan Email"...')
+    this.reporter.log('Memilih opsi pendaftaran akun ("Daftar di sini" / "Daftar dengan Email")...')
+    // Pada sheet "Masuk ke Akun Anda", link "Daftar di sini" berada di (650, 1680)
+    this.driver.tap(650, 1680)
+    await this.sleep(1000)
+    // Fallback tap tombol "Daftar dengan Email" jika pada modal varian sheet (540, 1890)
     this.driver.tap(COORDINATES.AUTH_SHEET.DAFTAR_EMAIL.x, COORDINATES.AUTH_SHEET.DAFTAR_EMAIL.y)
     await this.sleep(1500)
   }

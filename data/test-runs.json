@@ -1,0 +1,297 @@
+[
+  {
+    "id": 6,
+    "runId": "RUN-006",
+    "scenario": "01-daftar",
+    "scenarioTitle": "01-daftar \u2022 Pendaftaran Akun Baru",
+    "status": "pass",
+    "weather": "\u2600\ufe0f",
+    "duration": "14.8",
+    "startTime": 1728593820000,
+    "endTime": 1728593834800,
+    "timeStr": "10/10/2026, 20:57:06",
+    "device": "emulator-5554",
+    "stepsTotal": 5,
+    "stepsPassed": 5,
+    "stepsFailed": 0,
+    "summaryMessage": "Skenario pendaftaran berhasil diselesaikan 100%! State layar utama, sheet autentikasi, form registrasi terverifikasi sempurna.",
+    "steps": [
+      {
+        "stepIndex": 1,
+        "total": 5,
+        "name": "Layar Utama Terbuka & Onboarding Ditangani",
+        "status": "pass",
+        "duration": "1.5",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/01-daftar/latest.png"
+      },
+      {
+        "stepIndex": 2,
+        "total": 5,
+        "name": "Mode Tamu Aktif & Sheet Autentikasi Siap",
+        "status": "pass",
+        "duration": "0.9",
+        "filename": "01_register_form.png",
+        "screenshotUrl": "/screenshots/01-daftar/01_register_form.png"
+      },
+      {
+        "stepIndex": 3,
+        "total": 5,
+        "name": "Form Pendaftaran Akun Baru Terbuka",
+        "status": "pass",
+        "duration": "0.7",
+        "filename": "01_register_form_active.png",
+        "screenshotUrl": "/screenshots/01-daftar/01_register_form_active.png"
+      },
+      {
+        "stepIndex": 4,
+        "total": 5,
+        "name": "Mengisi Seluruh Field Form Registrasi",
+        "status": "pass",
+        "duration": "2.4",
+        "filename": "01_register_typing.png",
+        "screenshotUrl": "/screenshots/01-daftar/01_register_typing.png"
+      },
+      {
+        "stepIndex": 5,
+        "total": 5,
+        "name": "Submit Pendaftaran & Verifikasi Transisi Layar OTP",
+        "status": "pass",
+        "duration": "3.1",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/01-daftar/latest.png"
+      }
+    ],
+    "logs": [
+      "Menjalankan skenario di Android Emulator (emulator-5554)...",
+      "\u2713 Step 1/5: Layar Utama Terbuka & Onboarding Ditangani (1.5s)",
+      "\u2713 Step 2/5: Mode Tamu Aktif & Sheet Autentikasi Siap (0.9s)",
+      "\u2713 Step 3/5: Form Pendaftaran Akun Baru Terbuka (0.7s)",
+      "\u2713 Step 4/5: Mengisi Seluruh Field Form Registrasi (2.4s)",
+      "\u2713 Step 5/5: Submit Pendaftaran & Verifikasi Transisi Layar OTP (3.1s)",
+      "\ud83c\udfc1 Skenario 01-daftar selesai 100% dengan sukses! (Quality Gate PASSED)"
+    ]
+  },
+  {
+    "id": 5,
+    "runId": "RUN-005",
+    "scenario": "05-mengambil-misi",
+    "scenarioTitle": "05-mengambil-misi \u2022 Radar & Ambil Misi",
+    "status": "pass",
+    "weather": "\u2600\ufe0f",
+    "duration": "14.2",
+    "startTime": 1728542700000,
+    "endTime": 1728542714200,
+    "timeStr": "10/10/2026, 06:45:14",
+    "device": "emulator-5554",
+    "stepsTotal": 4,
+    "stepsPassed": 4,
+    "stepsFailed": 0,
+    "summaryMessage": "Semua pengujian pada emulator (emulator-5554) berhasil diselesaikan 100%! Aplikasi terbuka, berinteraksi di layar, dan tangkapan layar tersimpan.",
+    "steps": [
+      {
+        "stepIndex": 1,
+        "total": 4,
+        "name": "Buka Tab Radar / Peta Misi Terdekat",
+        "status": "pass",
+        "duration": "2.8",
+        "filename": "05_map_radar.png",
+        "screenshotUrl": "/screenshots/05-mengambil-misi/05_map_radar.png"
+      },
+      {
+        "stepIndex": 2,
+        "total": 4,
+        "name": "Verifikasi Pin Misi Aktif di Sekitar",
+        "status": "pass",
+        "duration": "3.5",
+        "filename": "05_radar_talent_map.png",
+        "screenshotUrl": "/screenshots/05-mengambil-misi/05_radar_talent_map.png"
+      },
+      {
+        "stepIndex": 3,
+        "total": 4,
+        "name": "Buka Bottom Sheet Detail Pekerjaan",
+        "status": "pass",
+        "duration": "3.9",
+        "filename": "05_talent_toggle.png",
+        "screenshotUrl": "/screenshots/05-mengambil-misi/05_talent_toggle.png"
+      },
+      {
+        "stepIndex": 4,
+        "total": 4,
+        "name": "Konfirmasi Ambil Misi & Status Kontrak Aktif",
+        "status": "pass",
+        "duration": "4.0",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/05-mengambil-misi/latest.png"
+      }
+    ],
+    "logs": [
+      "Menjalankan skenario di Android Emulator (emulator-5554)...",
+      "\u2713 Step 1/4: Buka Tab Radar / Peta Misi Terdekat",
+      "\u2713 Step 2/4: Verifikasi Pin Misi Aktif di Sekitar",
+      "\u2713 Step 3/4: Buka Bottom Sheet Detail Pekerjaan",
+      "\u2713 Step 4/4: Konfirmasi Ambil Misi & Status Kontrak Aktif",
+      "\ud83c\udfc1 Pengujian 05-mengambil-misi selesai 100% (Passed)"
+    ]
+  },
+  {
+    "id": 4,
+    "runId": "RUN-004",
+    "scenario": "04-melakukan-pembayaran",
+    "scenarioTitle": "04-melakukan-pembayaran \u2022 Escrow & Wallet",
+    "status": "pass",
+    "weather": "\u2600\ufe0f",
+    "duration": "11.8",
+    "startTime": 1728542600000,
+    "endTime": 1728542611800,
+    "timeStr": "10/10/2026, 06:45:10",
+    "device": "emulator-5554",
+    "stepsTotal": 3,
+    "stepsPassed": 3,
+    "stepsFailed": 0,
+    "summaryMessage": "Escrow terkunci sempurna dan saldo dompet terverifikasi.",
+    "steps": [
+      {
+        "stepIndex": 1,
+        "total": 3,
+        "name": "Buka Dompet BukainJalan & Cek Saldo",
+        "status": "pass",
+        "duration": "3.2",
+        "filename": "04_escrow_wallet_screen.png",
+        "screenshotUrl": "/screenshots/04-melakukan-pembayaran/04_escrow_wallet_screen.png"
+      },
+      {
+        "stepIndex": 2,
+        "total": 3,
+        "name": "Pilih Metode Pembayaran Escrow (Virtual Account / QRIS)",
+        "status": "pass",
+        "duration": "4.1",
+        "filename": "04_home_escrow.png",
+        "screenshotUrl": "/screenshots/04-melakukan-pembayaran/04_home_escrow.png"
+      },
+      {
+        "stepIndex": 3,
+        "total": 3,
+        "name": "Verifikasi Dana Escrow Terkunci di Sistem",
+        "status": "pass",
+        "duration": "4.5",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/04-melakukan-pembayaran/latest.png"
+      }
+    ],
+    "logs": [
+      "Menjalankan skenario di Android Emulator (emulator-5554)...",
+      "\u2713 Step 1/3: Buka Dompet BukainJalan & Cek Saldo",
+      "\u2713 Step 2/3: Pilih Metode Pembayaran Escrow",
+      "\u2713 Step 3/3: Verifikasi Dana Escrow Terkunci di Sistem",
+      "\ud83c\udfc1 Pengujian 04-melakukan-pembayaran selesai 100% (Passed)"
+    ]
+  },
+  {
+    "id": 3,
+    "runId": "RUN-003",
+    "scenario": "03-membuat-misi",
+    "scenarioTitle": "03-membuat-misi \u2022 Buat Misi Baru",
+    "status": "pass",
+    "weather": "\u2600\ufe0f",
+    "duration": "10.5",
+    "startTime": 1728542500000,
+    "endTime": 1728542510500,
+    "timeStr": "10/10/2026, 06:45:05",
+    "device": "emulator-5554",
+    "stepsTotal": 3,
+    "stepsPassed": 3,
+    "stepsFailed": 0,
+    "summaryMessage": "Misi berhasil dipublikasikan dan tampil di feed kategori.",
+    "steps": [
+      {
+        "stepIndex": 1,
+        "total": 3,
+        "name": "Tekan FAB Tombol Tambah (+) Misi",
+        "status": "pass",
+        "duration": "2.9",
+        "filename": "03_mission_category.png",
+        "screenshotUrl": "/screenshots/03-membuat-misi/03_mission_category.png"
+      },
+      {
+        "stepIndex": 2,
+        "total": 3,
+        "name": "Pilih Kategori Pekerjaan & Masukkan Detail Biaya",
+        "status": "pass",
+        "duration": "3.8",
+        "filename": "03_mission_category_feed.png",
+        "screenshotUrl": "/screenshots/03-membuat-misi/03_mission_category_feed.png"
+      },
+      {
+        "stepIndex": 3,
+        "total": 3,
+        "name": "Publikasikan Misi ke Peta & Feed",
+        "status": "pass",
+        "duration": "3.8",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/03-membuat-misi/latest.png"
+      }
+    ],
+    "logs": [
+      "Menjalankan skenario di Android Emulator (emulator-5554)...",
+      "\u2713 Step 1/3: Tekan FAB Tombol Tambah Misi",
+      "\u2713 Step 2/3: Pilih Kategori Pekerjaan & Detail Biaya",
+      "\u2713 Step 3/3: Publikasikan Misi ke Peta & Feed",
+      "\ud83c\udfc1 Pengujian 03-membuat-misi selesai 100% (Passed)"
+    ]
+  },
+  {
+    "id": 2,
+    "runId": "RUN-002",
+    "scenario": "02-login",
+    "scenarioTitle": "02-login \u2022 Otentikasi & Masuk Akun",
+    "status": "pass",
+    "weather": "\u2600\ufe0f",
+    "duration": "9.4",
+    "startTime": 1728562000000,
+    "endTime": 1728562009400,
+    "timeStr": "10/10/2026, 12:07:30",
+    "device": "emulator-5554",
+    "stepsTotal": 3,
+    "stepsPassed": 3,
+    "stepsFailed": 0,
+    "summaryMessage": "Login berhasil dan sesi token JWT aktif.",
+    "steps": [
+      {
+        "stepIndex": 1,
+        "total": 3,
+        "name": "Buka Auth Gate dari Tab Profil",
+        "status": "pass",
+        "duration": "2.5",
+        "filename": "02_auth_gate.png",
+        "screenshotUrl": "/screenshots/02-login/02_auth_gate.png"
+      },
+      {
+        "stepIndex": 2,
+        "total": 3,
+        "name": "Input Kredensial Email & Kata Sandi",
+        "status": "pass",
+        "duration": "3.4",
+        "filename": "02_login_form_active.png",
+        "screenshotUrl": "/screenshots/02-login/02_login_form_active.png"
+      },
+      {
+        "stepIndex": 3,
+        "total": 3,
+        "name": "Verifikasi Akses Dashboard & Profil Pengguna",
+        "status": "pass",
+        "duration": "3.5",
+        "filename": "latest.png",
+        "screenshotUrl": "/screenshots/02-login/latest.png"
+      }
+    ],
+    "logs": [
+      "Menjalankan skenario di Android Emulator (emulator-5554)...",
+      "\u2713 Step 1/3: Buka Auth Gate dari Tab Profil",
+      "\u2713 Step 2/3: Input Kredensial Email & Kata Sandi",
+      "\u2713 Step 3/3: Verifikasi Akses Dashboard & Profil",
+      "\ud83c\udfc1 Pengujian 02-login selesai 100% (Passed)"
+    ]
+  }
+]

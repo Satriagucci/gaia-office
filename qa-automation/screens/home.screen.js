@@ -45,7 +45,7 @@ export class HomeScreen extends BaseScreen {
     try {
       await this.waitForScreen('auth_sheet', 6)
       this.reporter.log('✅ Mode Tamu terdeteksi: Bottom Sheet Autentikasi langsung aktif.')
-      return { isGuest: true, state: 'guest' }
+      return { isGuest: true, state: 'guest', sheetAlreadyOpen: true }
     } catch {
       this.reporter.log('⚠️ Terdeteksi akun dalam keadaan login! Melakukan alur Logout...')
     }

@@ -75,6 +75,45 @@ function saveBuildRecord(record) {
   }
 }
 
+// ── TEST RUNS HISTORY PERSISTENCE (JENKINS / ALLURE STANDARD) ──
+const TEST_RUNS_FILE = join(DATA_DIR, 'test-runs.json')
+
+function loadTestRuns() {
+  try {
+    if (existsSync(TEST_RUNS_FILE)) {
+      const data = JSON.parse(readFileSync(TEST_RUNS_FILE, 'utf-8'))
+      if (Array.isArray(data)) return data
+    }
+  } catch {}
+  return []
+}
+
+function saveTestRuns(list) {
+  try {
+    writeFileSync(TEST_RUNS_FILE, JSON.stringify(list, null, 2), 'utf-8')
+  } catch (e) {
+    console.error('saveTestRuns error:', e.message)
+  }
+}
+
+function recordTestRun(record) {
+  try {
+    const list = loadTestRuns()
+    const idx = list.findIndex(r => (r.runId && r.runId === record.runId) || (r.id && r.id === record.id))
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...record }
+    } else {
+      list.unshift(record)
+    }
+    if (list.length > 50) list.length = 50
+    saveTestRuns(list)
+    return list
+  } catch (e) {
+    console.error('recordTestRun error:', e.message)
+    return loadTestRuns()
+  }
+}
+
 // ── PERSISTENT BUILD PIPELINE STATE ──
 const currentBuild = {
   active: false,
@@ -317,6 +356,11 @@ function writeScenarioRuns(scenario, runs) {
 }
 
 function getScenarioStatus(scenario) {
+  const runs = loadTestRuns()
+  const latestRun = runs.find(r => r.scenario === scenario)
+  if (latestRun) {
+    return latestRun.status === 'pass' ? 'pass' : latestRun.status === 'fail' ? 'fail' : 'pending'
+  }
   const md = readScenarioMd(scenario)
   if (!md) return 'new'
   if (/## Status[\r\n\s]*✅/i.test(md) || (md.includes('✅') && !md.includes('❌') && !md.includes('⏳'))) return 'pass'
@@ -461,6 +505,46 @@ app.post('/api/scenarios/:scenario/upload-capture', (req, res) => {
     console.warn('[upload-capture] Gagal mencatat runs.json:', err.message)
   }
 
+  // Sync to central test-runs.json (Jenkins standard)
+  try {
+    const activeRunId = runId || `run-${new Date().toISOString().slice(0, 10)}`
+    const centralRuns = loadTestRuns()
+    let centralRun = centralRuns.find(r => r.runId === activeRunId)
+    if (!centralRun) {
+      centralRun = {
+        id: centralRuns.length + 1,
+        runId: activeRunId,
+        scenario,
+        scenarioTitle: scenario,
+        status: 'running',
+        weather: '⏳',
+        device: activeRunner?.device || 'emulator-5554',
+        startTime: Date.now(),
+        timeStr: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+        steps: [],
+        logs: []
+      }
+      centralRuns.unshift(centralRun)
+    }
+    const stepObjForCentral = {
+      stepIndex: stepIndex || (centralRun.steps.length + 1),
+      total: total || 5,
+      name: name || targetFile,
+      filename: targetFile,
+      screenshotUrl: `/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(targetFile)}`,
+      duration: duration || null,
+      status: status || 'pass',
+      time: new Date().toISOString()
+    }
+    const stIdx = centralRun.steps.findIndex(s => s.stepIndex === stepObjForCentral.stepIndex)
+    if (stIdx >= 0) centralRun.steps[stIdx] = stepObjForCentral
+    else centralRun.steps.push(stepObjForCentral)
+    centralRun.lastUpdated = new Date().toISOString()
+    saveTestRuns(centralRuns)
+  } catch (err) {
+    console.warn('[upload-capture] Gagal mencatat central test-runs.json:', err.message)
+  }
+
   res.json({ ok: true, filename: targetFile })
 })
 
@@ -513,23 +597,70 @@ app.get('/', (_req, res) => {
   res.send(renderDashboardView({ scenarios, apks, runner: runnerInfo }))
 })
 
+// ── Test Runs History API (Jenkins/Allure Standard) ──
+app.get('/api/test-runs', (_req, res) => {
+  const runs = loadTestRuns()
+  const total = runs.length
+  const passed = runs.filter(r => r.status === 'pass').length
+  const failed = runs.filter(r => r.status === 'fail').length
+  const passRate = total > 0 ? Math.round((passed / total) * 100) : 100
+  const avgDuration = total > 0 ? (runs.reduce((acc, r) => acc + (parseFloat(r.duration) || 0), 0) / total).toFixed(1) : '0.0'
+  res.json({
+    ok: true,
+    metrics: { total, passed, failed, passRate, avgDuration },
+    runs
+  })
+})
+
+app.get('/api/test-runs/:runId', (req, res) => {
+  const runs = loadTestRuns()
+  const run = runs.find(r => r.runId === req.params.runId)
+  if (!run) return res.status(404).json({ ok: false, error: 'Run record not found' })
+  res.json({ ok: true, run })
+})
+
 // ── Test Bank Index Page ──
 app.get('/screenshots', (_req, res) => {
+  const runs = loadTestRuns()
+  const totalRuns = runs.length
+  const passedRuns = runs.filter(r => r.status === 'pass').length
+  const failedRuns = runs.filter(r => r.status === 'fail').length
+  const passRate = totalRuns > 0 ? Math.round((passedRuns / totalRuns) * 100) : 100
+  const avgDuration = totalRuns > 0 ? (runs.reduce((acc, r) => acc + (parseFloat(r.duration) || 0), 0) / totalRuns).toFixed(1) : '0.0'
+
+  const metrics = {
+    total: totalRuns,
+    passed: passedRuns,
+    failed: failedRuns,
+    passRate,
+    avgDuration
+  }
+
   const scenarios = listScenarios().map(s => {
     const caps = listCaptures(s)
     const md = readScenarioMd(s)
     const yaml = readScenarioYaml(s)
-    const status = getScenarioStatus(s)
+    const latestRun = runs.find(r => r.scenario === s)
+    const status = latestRun ? latestRun.status : getScenarioStatus(s)
     return {
       name: s,
       captures: caps.length,
-      lastCapture: caps[0]?.time || null,
+      lastCapture: latestRun?.timeStr || caps[0]?.time || null,
       status,
+      lastDuration: latestRun?.duration ? `${latestRun.duration}s` : null,
+      lastRunId: latestRun?.runId || null,
       hasScript: !!md,
       hasAutomation: !!yaml || !!readScenarioTestCode(s),
     }
   })
-  res.send(renderTestBankView({ scenarios }))
+
+  const runnerInfo = {
+    online: !!(activeRunner && activeRunner.ws?.readyState === WebSocket.OPEN),
+    device: activeRunner?.device || 'emulator-5554',
+    model: activeRunner?.model || 'Android SDK built for x86_64',
+  }
+
+  res.send(renderTestBankView({ scenarios, runs, metrics, runner: runnerInfo }))
 })
 
 // ── Scenario Detail Page ──
@@ -638,21 +769,84 @@ app.get('/screenshots/:scenario/run', (req, res) => {
       return res.end()
     }
 
-    const jobId = `test-${Date.now()}`
+    const jobId = `RUN-${Date.now().toString().slice(-4)}`
     send({ type: 'info', message: `Menjalankan skenario di Android Emulator (${activeRunner.device})...` })
 
+    const initialRun = {
+      id: loadTestRuns().length + 1,
+      runId: jobId,
+      scenario,
+      scenarioTitle: `${scenario}`,
+      status: 'running',
+      weather: '⏳',
+      device: activeRunner.device,
+      startTime: Date.now(),
+      timeStr: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      stepsTotal: 5,
+      stepsPassed: 0,
+      stepsFailed: 0,
+      steps: [],
+      logs: []
+    }
+    recordTestRun(initialRun)
+
     activeJobs.set(jobId, {
-      onLog: (msg) => send({ type: 'info', message: msg }),
+      onLog: (msg) => {
+        try {
+          const list = loadTestRuns()
+          const r = list.find(x => x.runId === jobId)
+          if (r) {
+            if (!r.logs) r.logs = []
+            r.logs.push(msg)
+            saveTestRuns(list)
+          }
+        } catch {}
+        send({ type: 'info', message: msg })
+      },
       onProgress: (p) => send({ ...p, type: 'progress', percent: p.percent || p.progressPct }),
-      onStep: (s) => send({ ...s, type: 'step', name: s.name || s.description }),
+      onStep: (s) => {
+        try {
+          const list = loadTestRuns()
+          const r = list.find(x => x.runId === jobId)
+          if (r) {
+            const stObj = {
+              stepIndex: s.stepIndex || (r.steps.length + 1),
+              total: s.total || 5,
+              name: s.name || s.description || 'Step',
+              status: s.status || 'pass',
+              filename: s.screenshot || s.filename || null,
+              screenshotUrl: s.screenshot ? `/screenshots/${encodeURIComponent(scenario)}/${encodeURIComponent(s.screenshot)}` : null,
+              duration: s.duration || null,
+              time: new Date().toISOString()
+            }
+            const existIdx = r.steps.findIndex(x => x.stepIndex === stObj.stepIndex)
+            if (existIdx >= 0) r.steps[existIdx] = stObj
+            else r.steps.push(stObj)
+            r.stepsPassed = r.steps.filter(x => x.status === 'pass').length
+            r.stepsFailed = r.steps.filter(x => x.status === 'fail').length
+            saveTestRuns(list)
+          }
+        } catch {}
+        send({ ...s, type: 'step', name: s.name || s.description })
+      },
       onResult: (r) => {
         try {
           updateScenarioStatus(scenario, r.status, r.message)
-          const runs = readScenarioRuns(scenario)
-          const runEntry = runs.find(run => run.runId === jobId) || runs[0]
+          const list = loadTestRuns()
+          const runEntry = list.find(x => x.runId === jobId)
           if (runEntry) {
             runEntry.status = r.status
+            runEntry.weather = r.status === 'pass' ? '☀️' : '🌧️'
+            runEntry.endTime = Date.now()
+            runEntry.duration = runEntry.startTime ? ((runEntry.endTime - runEntry.startTime) / 1000).toFixed(1) : '12.0'
             runEntry.summaryMessage = r.message
+            saveTestRuns(list)
+          }
+          const runs = readScenarioRuns(scenario)
+          const scEntry = runs.find(run => run.runId === jobId) || runs[0]
+          if (scEntry) {
+            scEntry.status = r.status
+            scEntry.summaryMessage = r.message
             writeScenarioRuns(scenario, runs)
           }
         } catch (e) {
@@ -666,11 +860,21 @@ app.get('/screenshots/:scenario/run', (req, res) => {
         const errMsg = err?.message || String(err)
         try {
           updateScenarioStatus(scenario, 'fail', errMsg)
-          const runs = readScenarioRuns(scenario)
-          const runEntry = runs.find(run => run.runId === jobId) || runs[0]
+          const list = loadTestRuns()
+          const runEntry = list.find(x => x.runId === jobId)
           if (runEntry) {
             runEntry.status = 'fail'
+            runEntry.weather = '🌧️'
+            runEntry.endTime = Date.now()
+            runEntry.duration = runEntry.startTime ? ((runEntry.endTime - runEntry.startTime) / 1000).toFixed(1) : '10.0'
             runEntry.errorMessage = errMsg
+            saveTestRuns(list)
+          }
+          const runs = readScenarioRuns(scenario)
+          const scEntry = runs.find(run => run.runId === jobId) || runs[0]
+          if (scEntry) {
+            scEntry.status = 'fail'
+            scEntry.errorMessage = errMsg
             writeScenarioRuns(scenario, runs)
           }
         } catch (e) {

@@ -43,50 +43,54 @@ def analyze_screen(img_path):
     p_bot = px(100, 2150)
     p_center = px(540, 1140)
     
-    # 1. Check Logout Confirmation Dialog (ActionableSheet with red "Ya, Keluar" button)
+    # 1. Check Home Screen FIRST: Deep cyan/blue hero header and pure white bottom navbar
+    is_home_header = (p_top[2] > 70 and p_top[0] < 80)
+    is_white_navbar = (p_bot[0] > 210 and p_bot[1] > 210 and p_bot[2] > 210)
+    if is_home_header and is_white_navbar:
+        return 'home'
+
+    # 2. Check Logout Confirmation Dialog (ActionableSheet with red "Ya, Keluar" button)
     p_logout_btn = px(540, 2020)
     if p_logout_btn[0] > 200 and p_logout_btn[1] < 80 and p_logout_btn[2] < 80:
         return 'logout_dialog'
-    
-    # 2. Check Auth Sheet (Bottom sheet with blue "Daftar dengan Email" button at 540, 1890)
+
+    # 3. Check Auth Sheet / Login Sheet ("Masuk ke Akun Anda")
+    # Has blue "Masuk" button at (540, 1480) or blue "Daftar di sini" at (650, 1680) or "Daftar dengan Email" at (540, 1890)
+    p_login_btn = px(540, 1480)
+    p_daftar_link = px(650, 1680)
     p_sheet_btn = px(540, 1890)
-    if p_sheet_btn[0] < 50 and p_sheet_btn[1] > 120 and p_sheet_btn[2] > 180 and p_top[2] > 60:
+    
+    is_login_blue = (p_login_btn[0] < 60 and p_login_btn[1] > 120 and p_login_btn[2] > 180)
+    is_daftar_link_blue = (p_daftar_link[0] < 60 and p_daftar_link[1] > 120 and p_daftar_link[2] > 180)
+    is_sheet_btn_blue = (p_sheet_btn[0] < 60 and p_sheet_btn[1] > 120 and p_sheet_btn[2] > 180)
+
+    if is_login_blue or is_daftar_link_blue or is_sheet_btn_blue:
         return 'auth_sheet'
-        
-    # 3. Check Register Form: White header/top, blue logo or title
+
+    # 4. Check Register Form ("Buat Akun Baru")
+    # White background, dark title "Buat Akun Baru" at y≈450-550, and input fields
     p_bg = px(540, 100)
-    if p_bg[0] > 235 and p_bg[1] > 235 and p_bg[2] > 235:
-        has_title = any(px(x, 495)[0] < 80 for x in range(350, 750, 20))
-        has_logo = any(px(x, 220)[2] > 160 and px(x, 220)[0] < 120 for x in range(400, 600, 20))
-        if has_title or has_logo:
+    if p_bg[0] > 230 and p_bg[1] > 230 and p_bg[2] > 230:
+        has_reg_title = sum(1 for x in range(350, 750, 30) if px(x, 500)[0] < 100) >= 3
+        # Verify it's not login form (in register form, login button at 1480 is NOT blue)
+        if has_reg_title and not is_login_blue:
             return 'register_form'
 
-    # 4. Check Login Form: White background with login elements
-    if p_bg[0] > 235 and p_bg[1] > 235 and p_bg[2] > 235:
-        p_login_btn = px(540, 1450)
-        if p_login_btn[0] < 60 and p_login_btn[1] > 120 and p_login_btn[2] > 180:
-            return 'login_form'
+    # 5. Check Onboarding Slides (ONLY if bottom navbar is NOT white)
+    if not is_white_navbar:
+        # Blue slide 1 (solid blue all over)
+        if p_top[2] > 170 and p_top[0] < 60 and p_bot[2] > 150:
+            return 'onboarding'
+        # Pink / gradient slides
+        if p_top[0] > 190 and p_top[1] < 130 and p_top[2] > 110:
+            return 'onboarding'
+        # Check "Lewati" text button area at top right (845, 140)
+        p_skip = px(845, 140)
+        if p_skip[0] > 200 and p_skip[1] > 200 and p_skip[2] > 200:
+            return 'onboarding'
 
-    # 5. Check Onboarding Slides (Top Skip button or carousel)
-    # Blue slide 1
-    if p_top[2] > 170 and p_top[0] < 60 and p_bot[2] > 150:
-        return 'onboarding'
-    # Pink / gradient slides
-    if p_top[0] > 190 and p_top[1] < 130 and p_top[2] > 110:
-        return 'onboarding'
-    # Check "Lewati" text button area at top right (845, 140)
-    p_skip = px(845, 140)
-    if p_skip[0] > 200 and p_skip[1] > 200 and p_skip[2] > 200 and p_bot[0] < 50:
-        return 'onboarding'
-
-    # 6. Check Home Screen: Deep cyan/blue hero header and white bottom navbar
-    if (p_top[2] > 70 and p_top[0] < 60) and (p_bot[0] > 210 and p_bot[1] > 210 and p_bot[2] > 210):
-        return 'home'
-        
-    # 7. Check Profile Screen (when user is already logged in): White/light bg with profile menus
-    if p_top[0] > 220 and p_top[1] > 220 and p_top[2] > 220 and p_bot[0] > 210:
-        # Check if logout button is present near bottom (red icon/text)
-        p_menu = px(100, 1800)
+    # 6. Check Profile Screen (when user is already logged in): White top and white bottom
+    if p_top[0] > 220 and p_top[1] > 220 and p_top[2] > 220 and is_white_navbar:
         return 'profile_logged_in'
 
     return 'unknown'
