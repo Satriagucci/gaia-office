@@ -1,0 +1,21 @@
+appId: com.bukainjalan.app
+name: "04-melakukan-pembayaran-flow"
+description: "Automation flow untuk pembayaran deposit escrow menggunakan QRIS / VA"
+steps:
+  - launchApp:
+      clearState: false
+  - assertVisible:
+      text: "Deposit Escrow"
+  - tapOn:
+      text: "QRIS"
+  - assertVisible:
+      text: "Scan untuk Bayar"
+  - takeScreenshot: "04_qris_payment_screen"
+  - tapOn:
+      text: "Simulasi Bayar (Test Mode)"
+  - assertVisible:
+      text: "Pembayaran Berhasil"
+  - tapOn:
+      text: "Lihat Misi Terbuka"
+  - assertVisible:
+      text: "Status: Terbuka"

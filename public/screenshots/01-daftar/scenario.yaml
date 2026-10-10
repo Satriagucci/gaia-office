@@ -1,0 +1,28 @@
+appId: com.bukainjalan.app
+name: "01-daftar-flow"
+description: "Automation flow untuk pendaftaran pengguna baru di BukainJalan"
+steps:
+  - launchApp:
+      clearState: false
+  - assertVisible:
+      text: "BukainJalan"
+  - tapOn:
+      point: "895,2080" # Tab Profil
+  - assertVisible:
+      text: "Mulai kerja di BukainJalan"
+  - tapOn:
+      point: "540,1930" # Tombol Daftar dengan Email
+  - assertVisible:
+      text: "Buat Akun Baru"
+  - inputText:
+      field: "nama_lengkap"
+      value: "QA Test User"
+  - inputText:
+      field: "email"
+      value: "qa_auto_${TIMESTAMP}@bukainjalan.test"
+  - inputText:
+      field: "password"
+      value: "Password123!"
+  - takeScreenshot: "01_register_form_filled"
+  - tapOn:
+      text: "Daftar Sekarang"

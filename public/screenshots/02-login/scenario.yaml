@@ -1,0 +1,25 @@
+appId: com.bukainjalan.app
+name: "02-login-flow"
+description: "Automation flow untuk otentikasi login pengguna di BukainJalan"
+steps:
+  - launchApp:
+      clearState: false
+  - tapOn:
+      point: "895,2080" # Tab Profil
+  - assertVisible:
+      text: "Mulai kerja di BukainJalan"
+  - tapOn:
+      text: "Masuk"
+  - assertVisible:
+      text: "Selamat Datang Kembali"
+  - inputText:
+      field: "email_or_phone"
+      value: "${REGISTERED_EMAIL}"
+  - inputText:
+      field: "password"
+      value: "Password123!"
+  - takeScreenshot: "02_login_form_filled"
+  - tapOn:
+      text: "Masuk Sekarang"
+  - assertVisible:
+      text: "Saldo Dompet"

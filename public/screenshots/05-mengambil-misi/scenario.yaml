@@ -1,0 +1,24 @@
+appId: com.bukainjalan.app
+name: "05-mengambil-misi-flow"
+description: "Automation flow untuk talent mengambil misi aktif dari radar"
+steps:
+  - launchApp:
+      clearState: false
+  - tapOn:
+      point: "295,2080" # Tab Peta / Radar
+  - assertVisible:
+      text: "Cari Misi"
+  - tapOn:
+      text: "Misi Terdekat"
+  - assertVisible:
+      text: "Detail Misi"
+  - takeScreenshot: "05_mission_detail_screen"
+  - tapOn:
+      text: "Ambil Misi Ini"
+  - assertVisible:
+      text: "Misi Berhasil Diambil"
+  - takeScreenshot: "05_order_taken_screen"
+  - tapOn:
+      text: "Lihat Status Pengerjaan"
+  - assertVisible:
+      text: "Status: Sedang Dikerjakan"
