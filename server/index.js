@@ -543,10 +543,10 @@ app.get('/screenshots/:scenario/run', (req, res) => {
     send({ type: 'info', message: `Menjalankan skenario di Android Emulator (${activeRunner.device})...` })
 
     activeJobs.set(jobId, {
-      onProgress: (p) => send({ type: 'progress', ...p }),
-      onStep: (s) => send({ type: 'step', ...s }),
+      onProgress: (p) => send({ ...p, type: 'progress', percent: p.percent || p.progressPct }),
+      onStep: (s) => send({ ...s, type: 'step', name: s.name || s.description }),
       onResult: (r) => {
-        send({ type: 'result', ...r })
+        send({ ...r, type: 'result' })
         activeJobs.delete(jobId)
         res.end()
       },
@@ -695,10 +695,10 @@ app.get('/api/testbank/run-all', (req, res) => {
     send({ type: 'info', message: `🚀 Menjalankan Full E2E Suite (5 Kepingan) di Android Emulator (${activeRunner.device})...` })
 
     activeJobs.set(jobId, {
-      onProgress: (p) => send({ type: 'progress', ...p }),
-      onStep: (s) => send({ type: 'step', ...s }),
+      onProgress: (p) => send({ ...p, type: 'progress', percent: p.percent || p.progressPct }),
+      onStep: (s) => send({ ...s, type: 'step', name: s.name || s.description }),
       onResult: (r) => {
-        send({ type: 'result', ...r })
+        send({ ...r, type: 'result' })
         activeJobs.delete(jobId)
         res.end()
       },

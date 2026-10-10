@@ -1982,6 +1982,7 @@ export function renderTestBankView({ scenarios = [] }) {
       const logBox = document.getElementById('modalLogBox');
       const pBar = document.getElementById('modalProgressBar');
       const badge = document.getElementById('modalRunBadge');
+      let isDone = false;
 
       if (activeTestSSE) activeTestSSE.close();
       activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=laptop');
@@ -1991,24 +1992,26 @@ export function renderTestBankView({ scenarios = [] }) {
           const d = JSON.parse(e.data);
           const line = document.createElement('div');
 
-          if (d.type === 'step') {
+          if (d.type === 'step' || d.type === 'runner_step') {
             line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
-            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + d.name + (d.screenshot ? ' [' + d.screenshot + ']' : '');
+            const stepName = d.name || d.description || ('Step ' + (d.stepIndex || d.current || ''));
+            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + stepName + (d.screenshot ? ' [' + d.screenshot + ']' : '');
             if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'progress') {
-            if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'result') {
+          } else if (d.type === 'progress' || d.type === 'runner_progress') {
+            const pct = d.percent || d.progressPct;
+            if (pct) pBar.style.width = pct + '%';
+          } else if (d.type === 'result' || d.type === 'runner_test_result') {
+            isDone = true;
             clearInterval(testTimer);
             pBar.style.width = '100%';
             badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
             badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
             line.style.fontWeight = 'bold';
             line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
-            line.textContent = '🏁 ' + d.message;
+            line.textContent = '🏁 ' + (d.message || 'Selesai');
             document.getElementById('modalCloseBtn').textContent = 'Tutup';
             document.getElementById('modalRefreshBtn').style.display = 'inline-block';
-            activeTestSSE.close();
-            activeTestSSE = null;
+            if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
           } else {
             line.style.color = '#94a3b8';
             line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
@@ -2022,6 +2025,7 @@ export function renderTestBankView({ scenarios = [] }) {
       };
 
       activeTestSSE.onerror = function() {
+        if (isDone) return;
         clearInterval(testTimer);
         badge.className = 'jenkins-badge red';
         badge.textContent = '#ERROR';
@@ -2040,6 +2044,7 @@ export function renderTestBankView({ scenarios = [] }) {
       const logBox = document.getElementById('modalLogBox');
       const pBar = document.getElementById('modalProgressBar');
       const badge = document.getElementById('modalRunBadge');
+      let isDone = false;
 
       if (activeTestSSE) activeTestSSE.close();
       activeTestSSE = new EventSource('/api/testbank/run-all?target=laptop');
@@ -2049,24 +2054,26 @@ export function renderTestBankView({ scenarios = [] }) {
           const d = JSON.parse(e.data);
           const line = document.createElement('div');
 
-          if (d.type === 'step') {
+          if (d.type === 'step' || d.type === 'runner_step') {
             line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
-            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + d.name + (d.screenshot ? ' [' + d.screenshot + ']' : '');
+            const stepName = d.name || d.description || ('Step ' + (d.stepIndex || d.current || ''));
+            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + stepName + (d.screenshot ? ' [' + d.screenshot + ']' : '');
             if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'progress') {
-            if (d.percent) pBar.style.width = d.percent + '%';
-          } else if (d.type === 'result') {
+          } else if (d.type === 'progress' || d.type === 'runner_progress') {
+            const pct = d.percent || d.progressPct;
+            if (pct) pBar.style.width = pct + '%';
+          } else if (d.type === 'result' || d.type === 'runner_test_result') {
+            isDone = true;
             clearInterval(testTimer);
             pBar.style.width = '100%';
             badge.className = 'jenkins-badge ' + (d.status === 'pass' ? 'green' : 'red');
             badge.textContent = d.status === 'pass' ? '#SUCCESS' : '#FAILED';
             line.style.fontWeight = 'bold';
             line.style.color = d.status === 'pass' ? '#10b981' : '#ef4444';
-            line.textContent = '🏁 ' + d.message;
+            line.textContent = '🏁 ' + (d.message || 'Selesai');
             document.getElementById('modalCloseBtn').textContent = 'Tutup';
             document.getElementById('modalRefreshBtn').style.display = 'inline-block';
-            activeTestSSE.close();
-            activeTestSSE = null;
+            if (activeTestSSE) { activeTestSSE.close(); activeTestSSE = null; }
           } else {
             line.style.color = '#94a3b8';
             line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
@@ -2080,6 +2087,7 @@ export function renderTestBankView({ scenarios = [] }) {
       };
 
       activeTestSSE.onerror = function() {
+        if (isDone) return;
         clearInterval(testTimer);
         badge.className = 'jenkins-badge red';
         badge.textContent = '#ERROR';
