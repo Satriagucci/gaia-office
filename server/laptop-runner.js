@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
 import { dumpHierarchy, findNodeByText, clickText, getPerformanceStats } from './adb-helper.js'
 import { runOrganicUserSimulation } from './simulator/organic-user.js'
+import { runQaPipeline } from '../qa-automation/pipeline/runner.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -505,11 +506,52 @@ async function handleTest(cmd) {
     return
   }
 
-  // Jika skenario modular Test Bank atau 'all', gunakan alur nyata emulator
+  // Jika skenario modular Test Bank atau 'all', jalankan QA Automation Pipeline
   const modularKeys = ['01-daftar', '02-login', '03-membuat-misi', '04-melakukan-pembayaran', '05-mengambil-misi', 'all']
   if (modularKeys.some(k => scenario.includes(k))) {
     try {
-      await runModularMobileFlow(device, scenario, jobId)
+      await runQaPipeline(scenario, {
+        onLog: (msg) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'runner_log', jobId, message: msg }))
+          }
+        },
+        onStep: (step) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'runner_step',
+              jobId,
+              stepIndex: step.stepIndex,
+              name: step.name,
+              status: step.status,
+              screenshot: step.screenshot
+            }))
+          }
+        },
+        onProgress: (current, total, pct) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'runner_progress',
+              jobId,
+              current,
+              total,
+              percent: pct
+            }))
+          }
+        },
+        onDone: (summary) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'runner_test_result',
+              jobId,
+              status: summary.status,
+              message: summary.status === 'pass'
+                ? `Semua pengujian pada emulator (${device.id}) berhasil diselesaikan 100%! Aplikasi terbuka, berinteraksi di layar, dan tangkapan layar tersimpan.`
+                : `Pengujian selesai dengan ${summary.failed} kegagalan.`
+            }))
+          }
+        }
+      }, device.id)
     } catch (err) {
       console.error('[mobile-test] Error:', err.message)
       if (ws.readyState === WebSocket.OPEN) {

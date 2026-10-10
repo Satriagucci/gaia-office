@@ -17,7 +17,7 @@ def capture_screen(device_id, local_path):
 def check_app_focus(device_id):
     out = run_adb(device_id, 'shell', 'dumpsys', 'window')
     for line in out.splitlines():
-        if 'mCurrentFocus' in line and 'com.bukainjalan.app' in line:
+        if ('mCurrentFocus' in line or 'mFocusedApp' in line) and 'com.bukainjalan.app' in line:
             return True
     return False
 
