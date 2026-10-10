@@ -217,9 +217,9 @@ async function snapStep(device, scenario, current, total, name, filename, jobId)
   const tempFile = join(tmpdir(), `cap-${Date.now()}.png`)
   let imgBase64 = ''
   try {
-    execSync(`adb -s ${device.id} shell screencap -p /sdcard/s_tmp.png`, { timeout: 10000 })
-    execSync(`adb -s ${device.id} pull /sdcard/s_tmp.png "${tempFile}"`, { timeout: 10000 })
-    execSync(`adb -s ${device.id} shell rm /sdcard/s_tmp.png`, { timeout: 5000 })
+    execSync(`adb -s ${device.id} shell screencap -p /sdcard/s_tmp.png`, { timeout: 25000 })
+    execSync(`adb -s ${device.id} pull /sdcard/s_tmp.png "${tempFile}"`, { timeout: 20000 })
+    execSync(`adb -s ${device.id} shell rm /sdcard/s_tmp.png`, { timeout: 10000 })
     imgBase64 = readFileSync(tempFile).toString('base64')
     try { unlinkSync(tempFile) } catch {}
 
