@@ -1,7 +1,7 @@
 # Skenario 04: Melakukan Pembayaran Escrow (Payment)
 
 ## Status
-❌ FAIL
+✅ PASS
 
 ## Deskripsi
 Pengujian siklus pembayaran pendanaan jaminan (Escrow Deposit) untuk misi yang dibuat oleh Client. Meliputi pembuatan dynamic QRIS, pembentukan nomor Virtual Account (BCA/Mandiri/BRI), pemeriksaan status polling real-time (`/payment/check`), serta simulasi pelunasan (instant settlement) yang membuka status misi menjadi `OPEN`.
@@ -34,5 +34,9 @@ Pengujian siklus pembayaran pendanaan jaminan (Escrow Deposit) untuk misi yang d
 - Misi aktif dan siap diambil oleh talent.
 
 
-### Catatan Eksekusi Terakhir (10/10/2026, 12.55.52 WIB)
-- [FAIL] Fatal Error Pengujian Pembayaran: Tidak ada misi yang tersedia untuk diuji pembayarannya. Jalankan skenario 03 terlebih dahulu.
+### Catatan Eksekusi Terakhir (10/10/2026, 13.05.01 WIB)
+- [PASS] Generate Dynamic QRIS (EMVCo Protocol): QRIS String valid (194 chars), Nominal: Rp 36750
+- [PASS] Generate Virtual Account BCA: VA Number: 882104636961, Expired: 2026-10-11
+- [PASS] Polling Cek Status Pembayaran (Sebelum Bayar): Status Terbaca: isPaid=false, paymentStatus=PENDING
+- [PASS] Simulasi Instant Settlement Escrow (Test Mode): Simulasi pembayaran misi berhasil! Escrow telah terisi dan misi dibuka.
+- [PASS] Verifikasi Transisi Status Misi (OPEN / isPaid: true): Misi berhasil diaktifkan dengan status: OPEN

@@ -1,7 +1,7 @@
 # Skenario 03: Membuat Misi Baru (Create Mission)
 
 ## Status
-❌ FAIL
+✅ PASS
 
 ## Deskripsi
 Pengujian alur pembuatan order/misi baru oleh Client (Pemberi Kerja). Meliputi verifikasi syarat kontak (Level 2 telepon), pemilihan kategori pekerjaan, pengisian deskripsi, penentuan imbalan (reward), perhitungan biaya platform (app fee & escrow), dan status awal misi `AWAITING_PAYMENT`.
@@ -39,7 +39,8 @@ Pengujian alur pembuatan order/misi baru oleh Client (Pemberi Kerja). Meliputi v
 - Misi siap dilanjutkan ke tahap pembayaran (Skenario 04).
 
 
-### Catatan Eksekusi Terakhir (10/10/2026, 12.55.52 WIB)
+### Catatan Eksekusi Terakhir (10/10/2026, 13.04.58 WIB)
 - [PASS] Verifikasi Nomor Telepon Client (Level 2 Requirement): Nomor telepon berhasil diverifikasi via OTP
 - [PASS] Validasi Batas Minimum Reward (< Rp 1.000): Berhasil diblokir sistem validasi (HTTP 422)
-- [FAIL] Fatal Error Pengujian Buat Misi: Pembuatan misi gagal (400): {"success":false,"message":"XENDIT_SECRET_KEY tidak ditemukan di .env"}
+- [PASS] Pembuatan Misi Baru oleh Client: Misi ID: 42e32c74-a9ab-46e1-be47-38a367bd8611, Status: AWAITING_PAYMENT, PaymentStatus: PENDING
+- [PASS] Integritas Status Awal (AWAITING_PAYMENT): Misi terkunci dalam status pending payment sebelum escrow didanai

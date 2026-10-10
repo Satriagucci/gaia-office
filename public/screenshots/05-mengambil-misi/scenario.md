@@ -1,7 +1,7 @@
 # Skenario 05: Mengambil Misi oleh Talent (Take Mission / Create Order)
 
 ## Status
-❌ FAIL
+✅ PASS
 
 ## Deskripsi
 Pengujian alur pengambilan misi oleh Talent terverifikasi (Mitra Kerja). Meliputi verifikasi syarat kelayakan KYC Level 3 (KTP, Selfie, Email, Phone), pencarian misi terbuka pada radar/feed, proses klaim misi via `POST /orders/protected/mission/:id/take`, pembentukan Order dengan status `TAKEN`, dan pengurangan kuota pekerja yang dibutuhkan (*workersNeeded*).
@@ -34,5 +34,8 @@ Pengujian alur pengambilan misi oleh Talent terverifikasi (Mitra Kerja). Meliput
 - Dana escrow tetap terkunci aman hingga pekerjaan diselesaikan dan disetujui.
 
 
-### Catatan Eksekusi Terakhir (10/10/2026, 12.55.52 WIB)
-- [FAIL] Fatal Error Pengujian Ambil Misi: Tidak ada misi aktif untuk diambil. Jalankan skenario 03 & 04 terlebih dahulu.
+### Catatan Eksekusi Terakhir (10/10/2026, 13.05.05 WIB)
+- [PASS] Proteksi KYC Level 3 (Blokir User Non-KYC): Berhasil ditolak dengan kode 403: KYC verification required (Level 3).
+- [PASS] Promosi Kelayakan Talent ke Level 3 • VERIFIED: Talent resmi berstatus Level 3 (VERIFIED)
+- [PASS] Pengambilan Misi Resmi oleh Talent (Order Created): Order ID: de9c6e2a-aea3-4a65-b15f-d9199035876c, Status: TAKEN, BidAmount: Rp default
+- [PASS] Verifikasi Riwayat Pekerjaan Aktif Talent (/orders/me): Order aktif terdaftar pada workspace pekerjaan talent

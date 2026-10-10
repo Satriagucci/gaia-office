@@ -1,7 +1,7 @@
 # Skenario 01: Pendaftaran Akun Baru (Register)
 
 ## Status
-❌ FAIL
+✅ PASS
 
 ## Deskripsi
 Pengujian alur pendaftaran akun pengguna baru secara komprehensif, mencakup pengisian form di aplikasi mobile, validasi format field, pembuatan dompet (wallet Rp 0), pencegahan duplikasi email/username, serta inisialisasi level keamanan akun (Level 1).
@@ -31,5 +31,7 @@ Pengujian alur pendaftaran akun pengguna baru secara komprehensif, mencakup peng
 - Integritas data profil dan wallet terjamin secara atomik.
 
 
-### Catatan Eksekusi Terakhir (10/10/2026, 12.55.50 WIB)
-- [FAIL] Fatal Error Pengujian Register: fetch failed
+### Catatan Eksekusi Terakhir (10/10/2026, 13.04.56 WIB)
+- [PASS] Registrasi Pengguna Baru Valid: User ID: undefined, Email: qa_reg_1791612295219_961@bukainjalan.test
+- [PASS] Pencegahan Email Duplikat (Conflict Handling): Berhasil ditolak dengan kode 400: Email sudah digunakan
+- [PASS] Validasi Format Email Tidak Valid: Validasi format berhasil memblokir input invalid (HTTP 422)

@@ -30,7 +30,7 @@ Pengujian alur otentikasi pengguna terdaftar, penerbitan JWT Access Token, valid
 - User langsung diarahkan ke layar Beranda/Profil aktif dengan data yang sesuai.
 
 
-### Catatan Eksekusi Terakhir (10/10/2026, 12.55.52 WIB)
+### Catatan Eksekusi Terakhir (10/10/2026, 13.04.57 WIB)
 - [PASS] Penolakan Password Salah: Berhasil ditolak dengan kode 401: Kredensial tidak valid
 - [PASS] Otentikasi Login Valid: Token JWT berhasil diterbitkan (eyJhbGciOiJIUzI1NiIs...)
 - [PASS] Verifikasi Token pada Rute Terproteksi: Token berhasil mengakses layout profil terproteksi
