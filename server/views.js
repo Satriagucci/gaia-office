@@ -1984,7 +1984,7 @@ export function renderTestBankView({ scenarios = [] }) {
       const badge = document.getElementById('modalRunBadge');
 
       if (activeTestSSE) activeTestSSE.close();
-      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=engine');
+      activeTestSSE = new EventSource('/screenshots/' + encodeURIComponent(name) + '/run?target=laptop');
 
       activeTestSSE.onmessage = function(e) {
         try {
@@ -1993,7 +1993,7 @@ export function renderTestBankView({ scenarios = [] }) {
 
           if (d.type === 'step') {
             line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
-            line.textContent = d.name;
+            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + d.name + (d.screenshot ? ' [' + d.screenshot + ']' : '');
             if (d.percent) pBar.style.width = d.percent + '%';
           } else if (d.type === 'progress') {
             if (d.percent) pBar.style.width = d.percent + '%';
@@ -2011,7 +2011,7 @@ export function renderTestBankView({ scenarios = [] }) {
             activeTestSSE = null;
           } else {
             line.style.color = '#94a3b8';
-            line.textContent = d.message || JSON.stringify(d);
+            line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
           }
 
           logBox.appendChild(line);
@@ -2042,7 +2042,7 @@ export function renderTestBankView({ scenarios = [] }) {
       const badge = document.getElementById('modalRunBadge');
 
       if (activeTestSSE) activeTestSSE.close();
-      activeTestSSE = new EventSource('/api/testbank/run-all');
+      activeTestSSE = new EventSource('/api/testbank/run-all?target=laptop');
 
       activeTestSSE.onmessage = function(e) {
         try {
@@ -2051,7 +2051,7 @@ export function renderTestBankView({ scenarios = [] }) {
 
           if (d.type === 'step') {
             line.style.color = d.status === 'pass' ? '#34d399' : '#f87171';
-            line.textContent = d.name;
+            line.textContent = (d.status === 'pass' ? '✓ ' : '✗ ') + d.name + (d.screenshot ? ' [' + d.screenshot + ']' : '');
             if (d.percent) pBar.style.width = d.percent + '%';
           } else if (d.type === 'progress') {
             if (d.percent) pBar.style.width = d.percent + '%';
@@ -2069,7 +2069,7 @@ export function renderTestBankView({ scenarios = [] }) {
             activeTestSSE = null;
           } else {
             line.style.color = '#94a3b8';
-            line.textContent = d.message || JSON.stringify(d);
+            line.textContent = (d.message ? (d.message.startsWith('ℹ') ? '' : 'ℹ️ ') + d.message : JSON.stringify(d));
           }
 
           logBox.appendChild(line);

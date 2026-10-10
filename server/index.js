@@ -533,13 +533,14 @@ app.get('/screenshots/:scenario/run', (req, res) => {
       const md = readScenarioMd(scenario)
       steps = parseMdSteps(md)
     }
-    if (steps.length === 0) {
+    const modularKeys = ['01-daftar', '02-login', '03-membuat-misi', '04-melakukan-pembayaran', '05-mengambil-misi', 'all']
+    if (steps.length === 0 && !modularKeys.some(k => scenario.includes(k))) {
       send({ type: 'error', message: 'Tidak ada step di skenario ini.' })
       return res.end()
     }
 
     const jobId = `test-${Date.now()}`
-    send({ type: 'info', message: `Menjalankan ${steps.length} test steps di emulator laptop (${activeRunner.device})...` })
+    send({ type: 'info', message: `Menjalankan skenario di Android Emulator (${activeRunner.device})...` })
 
     activeJobs.set(jobId, {
       onProgress: (p) => send({ type: 'progress', ...p }),
@@ -683,7 +684,42 @@ app.get('/api/testbank/run-all', (req, res) => {
     'Access-Control-Allow-Origin': '*',
   })
 
-  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  const target = req.query?.target || (activeRunner ? 'laptop' : 'engine')
+
+  if (target === 'laptop') {
+    if (!activeRunner || activeRunner.ws?.readyState !== WebSocket.OPEN) {
+      send({ type: 'error', message: 'Laptop Runner Offline! Pastikan laptop-runner.js berjalan di laptop.' })
+      return res.end()
+    }
+    const jobId = `test-all-${Date.now()}`
+    send({ type: 'info', message: `🚀 Menjalankan Full E2E Suite (5 Kepingan) di Android Emulator (${activeRunner.device})...` })
+
+    activeJobs.set(jobId, {
+      onProgress: (p) => send({ type: 'progress', ...p }),
+      onStep: (s) => send({ type: 'step', ...s }),
+      onResult: (r) => {
+        send({ type: 'result', ...r })
+        activeJobs.delete(jobId)
+        res.end()
+      },
+      onError: (err) => {
+        send({ type: 'error', message: err })
+        activeJobs.delete(jobId)
+        res.end()
+      }
+    })
+
+    req.on('close', () => activeJobs.delete(jobId))
+
+    activeRunner.ws.send(JSON.stringify({
+      type: 'cmd_test',
+      jobId,
+      scenario: 'all',
+      steps: []
+    }))
+    return
+  }
+
   const testBankScript = join(__dirname, 'testbank', 'test-bank-runner.js')
 
   send({ type: 'info', message: '🚀 Memulai eksekusi 5 Kepingan Test Bank (Full E2E Pipeline)...' })
