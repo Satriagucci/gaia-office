@@ -1,4 +1,4 @@
-﻿import type { RoomId } from './rooms'
+import type { RoomId } from './rooms'
 
 export type AgentState =
   | 'idle'
@@ -36,6 +36,21 @@ export interface Agent {
   hiredAt: number
   pathQueue?: { x: number; y: number }[]  // waypoints to walk through
   isPlayer?: boolean        // true if controlled by the user
+  progress?: number         // 0 - 100 for live task progress bar
+  progressLabel?: string    // e.g. "Maestro Step 6/14" or "Compiling APK"
+  statusType?: 'normal' | 'working' | 'success' | 'error'
+}
+
+export interface DeliverableItem {
+  id: string
+  title: string
+  agentName: string
+  role: string
+  type: 'test' | 'build' | 'deploy' | 'review' | 'api'
+  timestamp: number
+  summary: string
+  link?: string
+  screenshotUrl?: string
 }
 
 export type Division =

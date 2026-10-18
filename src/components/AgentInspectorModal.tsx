@@ -10,6 +10,10 @@ interface AgentInspectorModalProps {
   currentRoomId: RoomId
   onSummonToRoom: (agentId: string, targetRoom: RoomId) => void
   onDirectChat: (agentName: string) => void
+  onTriggerTest?: () => void
+  onTriggerBuild?: () => void
+  onSendCoffeeBreak?: (agentId: string) => void
+  onOpenDashboard?: () => void
 }
 
 export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
@@ -18,6 +22,10 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
   currentRoomId,
   onSummonToRoom,
   onDirectChat,
+  onTriggerTest,
+  onTriggerBuild,
+  onSendCoffeeBreak,
+  onOpenDashboard,
 }) => {
   if (!agent) return null
 
@@ -26,6 +34,9 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
   const spriteSrc = getSpritePath(agent.id, agent.role, charBase, agent.spriteFacing || 'front-right')
   const currentRoomName = ROOMS[agent.room]?.name || agent.room
   const isHere = agent.room === currentRoomId
+
+  const isQA = agent.role === 'concierge' || agent.role === 'test-engineer'
+  const isDevOps = agent.role === 'devops' || agent.role === 'devops-engineer'
 
   return (
     <div className="agent-inspector-backdrop" onClick={onClose}>
@@ -65,18 +76,74 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
               <span className="stat-value">X: {agent.position.x.toFixed(1)}% | Y: {agent.position.y.toFixed(1)}%</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Tipe Agent</span>
-              <span className="stat-value">🤖 {agent.type}</span>
+              <span className="stat-label">Progress Live</span>
+              <span className="stat-value">
+                {agent.progress !== undefined ? `⚡ ${agent.progress}% (${agent.progressLabel || 'Aktif'})` : 'Standby'}
+              </span>
             </div>
           </div>
 
           {/* Current Task Box */}
           <div className="inspector-task-section">
             <div className="task-section-title">
-              <span>📌 Current Task & Directive:</span>
+              <span>📌 Tugas & Tanggung Jawab:</span>
             </div>
             <div className="task-content-box">
-              {agent.task || agent.statusText || 'Standby menunggu delegasi dari GAIA / Boss.'}
+              {agent.task || agent.statusText || 'Standby menunggu instruksi kerja dari Boss / Architect.'}
+            </div>
+          </div>
+
+          {/* RPG Directive Command Section */}
+          <div className="inspector-commands-section">
+            <span className="command-title">⚡ Perintah Langsung (Third-Person Action):</span>
+            <div className="command-btn-grid">
+              {isQA && onTriggerTest && (
+                <button
+                  className="btn-command btn-command-qa"
+                  onClick={() => {
+                    onTriggerTest()
+                    onClose()
+                  }}
+                >
+                  🧪 Jalankan Test Maestro
+                </button>
+              )}
+
+              {isDevOps && onTriggerBuild && (
+                <button
+                  className="btn-command btn-command-build"
+                  onClick={() => {
+                    onTriggerBuild()
+                    onClose()
+                  }}
+                >
+                  📦 Trigger Build APK Lokal
+                </button>
+              )}
+
+              {onSendCoffeeBreak && (
+                <button
+                  className="btn-command btn-command-coffee"
+                  onClick={() => {
+                    onSendCoffeeBreak(agent.id)
+                    onClose()
+                  }}
+                >
+                  ☕ Ajak Rehat & Ngopi di Kitchen
+                </button>
+              )}
+
+              {onOpenDashboard && (
+                <button
+                  className="btn-command btn-command-board"
+                  onClick={() => {
+                    onOpenDashboard()
+                    onClose()
+                  }}
+                >
+                  📋 Buka Kanban Board Divisi
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -6,7 +6,8 @@ import Character from './components/Character'
 import FurnitureRenderer from './components/FurnitureRenderer'
 import DivisionDashboard from './components/DivisionDashboard'
 import AgentInspectorModal from './components/AgentInspectorModal'
-import { DivisionTask, TaskStatus, Division } from './types'
+import DeliverableToast from './components/DeliverableToast'
+import { DivisionTask, TaskStatus, Division, DeliverableItem } from './types'
 import { Agent, OfficeEvent, AGENT_CONFIGS } from './types'
 import { getCurrentPhase, getPhaseLabel, type DayPhase } from './daylight'
 import { ROOMS, type RoomId } from './rooms'
@@ -2227,6 +2228,169 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
     }).catch(() => {})
   }, [addMsg])
 
+  // Live deliverable artifacts showcase
+  const [deliverables, setDeliverables] = useState<DeliverableItem[]>([
+    {
+      id: 'del-init-1',
+      title: 'Maestro Test Suite 02-login Lolos',
+      agentName: 'Alya (QA Lead)',
+      role: 'concierge',
+      type: 'test',
+      timestamp: Date.now() - 300000,
+      summary: 'Skenario autentikasi akun terdaftar BukainJalan lulus 100% di emulator.',
+      screenshotUrl: 'http://100.66.202.33:8788/tests',
+    },
+  ])
+
+  const handleDismissDeliverable = useCallback((id: string) => {
+    setDeliverables(prev => prev.filter(d => d.id !== id))
+  }, [])
+
+  const handleTriggerTest = useCallback(() => {
+    // Alya starts the test run
+    setAgents(prev => prev.map(a => {
+      if (a.role === 'concierge' || a.role === 'test-engineer') {
+        return {
+          ...a,
+          state: 'working',
+          task: 'Running Maestro QA Test: 03-membuat-misi',
+          statusText: '🧪 Maestro Running 03-membuat-misi',
+          progress: 15,
+          progressLabel: 'Maestro: 03-membuat-misi (15%)',
+          statusType: 'working',
+        }
+      }
+      return a
+    }))
+
+    handleSendMessage('🚀 @Alya tolong jalankan test automation flow 03-membuat-misi via Maestro emulator.', 'office-general')
+
+    let curProgress = 15
+    const testInterval = setInterval(() => {
+      curProgress += 20
+      if (curProgress >= 100) {
+        clearInterval(testInterval)
+        setAgents(prev => prev.map(a => {
+          if (a.role === 'concierge' || a.role === 'test-engineer') {
+            return {
+              ...a,
+              state: 'working',
+              progress: 100,
+              progressLabel: 'Test Lolos 100%',
+              statusText: '✅ Test Selesai (14/14 steps)',
+              statusType: 'success',
+            }
+          }
+          return a
+        }))
+
+        const newDel: DeliverableItem = {
+          id: `del-${Date.now()}`,
+          title: 'Maestro Test: 03-membuat-misi Selesai!',
+          agentName: 'Alya (QA Lead)',
+          role: 'concierge',
+          type: 'test',
+          timestamp: Date.now(),
+          summary: 'Skenario publikasi misi baru dan navigasi back berhasil diverifikasi di emulator Pixel 4.',
+          screenshotUrl: 'http://100.66.202.33:8788/tests',
+        }
+        setDeliverables(prev => [newDel, ...prev])
+        handleSendMessage('✅ @channel Hasil Maestro flow 03-membuat-misi PASSED 14/14 steps! Screenshot tersimpan di Test Bank.', 'qa-automation')
+      } else {
+        setAgents(prev => prev.map(a => {
+          if (a.role === 'concierge' || a.role === 'test-engineer') {
+            return {
+              ...a,
+              progress: curProgress,
+              progressLabel: `Step ${Math.round(curProgress / 7)}/14 (${curProgress}%)`,
+            }
+          }
+          return a
+        }))
+      }
+    }, 2500)
+  }, [handleSendMessage])
+
+  const handleTriggerBuild = useCallback(() => {
+    // Rani starts compiling
+    setAgents(prev => prev.map(a => {
+      if (a.role === 'devops') {
+        return {
+          ...a,
+          state: 'working',
+          task: 'Local APK Build: bukainjalan-mobile',
+          statusText: '📦 Compiling APK Release...',
+          progress: 10,
+          progressLabel: 'Gradle Init (10%)',
+          statusType: 'working',
+        }
+      }
+      return a
+    }))
+
+    handleSendMessage('⚙️ @Rani tolong jalankan local APK build via build-local.ps1 untuk profile staging.', 'devops')
+
+    let curProgress = 10
+    const buildInterval = setInterval(() => {
+      curProgress += 25
+      if (curProgress >= 100) {
+        clearInterval(buildInterval)
+        setAgents(prev => prev.map(a => {
+          if (a.role === 'devops') {
+            return {
+              ...a,
+              state: 'working',
+              progress: 100,
+              progressLabel: 'APK Ready (100%)',
+              statusText: '✅ Build APK Selesai',
+              statusType: 'success',
+            }
+          }
+          return a
+        }))
+
+        const newDel: DeliverableItem = {
+          id: `del-${Date.now()}`,
+          title: 'Build APK Staging v1.0.1 Berhasil',
+          agentName: 'Rani (DevOps)',
+          role: 'devops',
+          type: 'build',
+          timestamp: Date.now(),
+          summary: 'APK compiled via Gradle lokal (34.2 MB), auto-install ADB ke emulator siap.',
+        }
+        setDeliverables(prev => [newDel, ...prev])
+        handleSendMessage('🎉 @channel Build APK Staging lokal selesai tanpa kuota cloud! APK siap di-deploy.', 'devops')
+      } else {
+        setAgents(prev => prev.map(a => {
+          if (a.role === 'devops') {
+            return {
+              ...a,
+              progress: curProgress,
+              progressLabel: `Compiling Gradle (${curProgress}%)`,
+            }
+          }
+          return a
+        }))
+      }
+    }, 3000)
+  }, [handleSendMessage])
+
+  const handleSendCoffeeBreak = useCallback((agentId: string) => {
+    setAgents(prev => prev.map(a => {
+      if (a.id === agentId) {
+        return {
+          ...a,
+          room: 'main-office',
+          state: 'coffee-break',
+          targetPosition: { x: 74.8, y: 55.2 },
+          statusText: '☕ Rehat ngopi sebentar di Barista Cafe',
+        }
+      }
+      return a
+    }))
+    handleSendMessage(`☕ Rehat dulu ngopi di cafe lounge...`, 'office-general')
+  }, [handleSendMessage])
+
   const handleToggleMute = useCallback(() => {
     const nowMuted = sfx.toggleMute()
     setMuted(nowMuted)
@@ -2400,6 +2564,7 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
                   idleDurationMs={idleDurationMs}
                   zIndex={zOverride}
                   isTyping={typingAgents.has(agent.id)}
+                  isNearby={nearbyAgent?.id === agent.id}
                   onClick={(e) => {
                     e.stopPropagation()
                     setInspectingAgent(agent)
@@ -2421,7 +2586,7 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
                   setInspectingAgent(nearbyAgent)
                 }}
               >
-                💬 [E] Ngobrol dengan {nearbyAgent.name}
+                💬 [E] Bicara dengan {nearbyAgent.name}
               </div>
             )}
 
@@ -2477,6 +2642,19 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
               )
             })()}
 
+            {/* Third-Person Game Control HUD */}
+            <div className="third-person-hud">
+              <span className="hud-badge">🎮 THIRD-PERSON RPG</span>
+              <span className="hud-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Klik: Jalan</span>
+              {nearbyAgent ? (
+                <span className="hud-item hud-highlight"><kbd>E</kbd> Bicara ({nearbyAgent.name})</span>
+              ) : (
+                <span className="hud-item"><kbd>E</kbd> Dekati Meja Agent</span>
+              )}
+              <span className="hud-item"><kbd>Spasi</kbd> Kamera Boss</span>
+              <span className="hud-item" onClick={() => setIsDashboardOpen(true)} style={{ cursor: 'pointer' }}><kbd>D</kbd> Kanban</span>
+            </div>
+
             {/* Day/night overlay */}
             <div className={`day-overlay ${effectivePhase}`} />
           </div>
@@ -2484,6 +2662,13 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
           </div>
         </div>
       </div>
+
+      {/* Floating Deliverable / Test Results Toast Card */}
+      <DeliverableToast
+        items={deliverables}
+        onDismiss={handleDismissDeliverable}
+        onOpenTestBank={() => window.open('http://100.66.202.33:8788/tests', '_blank')}
+      />
 
       <SlackChat
         messages={messages}
@@ -2515,7 +2700,7 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
         onAssignNewTask={handleAssignNewTask}
       />
 
-      {/* Agent Inspector Modal */}
+      {/* Agent Inspector & Action Command Modal */}
       <AgentInspectorModal
         agent={inspectingAgent}
         onClose={() => setInspectingAgent(null)}
@@ -2524,6 +2709,10 @@ const [messages, setMessages] = useState<ChatMessage[]>([])
         onDirectChat={(agentName) => {
           handleSendMessage(`@${agentName} `, 'office-general')
         }}
+        onTriggerTest={handleTriggerTest}
+        onTriggerBuild={handleTriggerBuild}
+        onSendCoffeeBreak={handleSendCoffeeBreak}
+        onOpenDashboard={() => setIsDashboardOpen(true)}
       />
     </div>
   )

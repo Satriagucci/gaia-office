@@ -16,6 +16,8 @@ interface CharacterProps {
   zIndex?: number
   /** Show typing indicator (about to post a Slack message) */
   isTyping?: boolean
+  /** Whether the player/boss is standing right near this character */
+  isNearby?: boolean
   onClick?: (e: React.MouseEvent) => void
 }
 
@@ -67,7 +69,7 @@ const OPPOSITE: Record<SpriteDirection, SpriteDirection> = {
   'rear-right': 'front-left',
 }
 
-const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex, isTyping, onClick }) => {
+const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex, isTyping, isNearby, onClick }) => {
   const prevPosRef = useRef({ x: agent.position.x, y: agent.position.y })
   const directionRef = useRef<SpriteDirection>(agent.spriteFacing ?? 'front-right')
   const [turnedAround, setTurnedAround] = useState(false)
@@ -142,28 +144,53 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
   const ROLE_ACTIVITIES: Record<string, { label: string; icon: string; color: string }> = {
     'boss':             { label: 'CEO · Monitoring HQ', icon: '👑', color: '#f59e0b' },
     'assistant':        { label: 'Lead Dev · Coding & DB', icon: '💻', color: '#0ea5e9' },
-    'devops':           { label: 'Product · Review Misi', icon: '📋', color: '#8b5cf6' },
-    'concierge':        { label: 'Ops · KYC & Webhook', icon: '⚡', color: '#f43f5e' },
-    'test-engineer':    { label: 'Creator · Studio 4K', icon: '🎬', color: '#10b981' },
+    'devops':           { label: 'DevOps · Cluster & Build', icon: '⚙️', color: '#8b5cf6' },
+    'concierge':        { label: 'QA Lead · Maestro Testing', icon: '🧪', color: '#f43f5e' },
+    'test-engineer':    { label: 'Media · Studio 4K', icon: '🎬', color: '#10b981' },
   }
   const activity = ROLE_ACTIVITIES[agent.role]
 
   return (
     <div
-      className={`character-wrapper state-${animState} ${isSitting ? 'is-sitting' : ''} ${isWalking ? 'is-walking' : ''}`}
+      className={`character-wrapper state-${animState} ${isSitting ? 'is-sitting' : ''} ${isWalking ? 'is-walking' : ''} ${isNearby ? 'is-nearby-player' : ''}`}
       style={{
         left: `${agent.position.x}%`,
         top: `${agent.position.y}%`,
         transform: 'translate(-50%, -100%)',
         zIndex: zIndex ?? Math.round(agent.position.y),
+        cursor: onClick ? 'pointer' : 'default',
       }}
+      onClick={onClick}
     >
+      {/* Third-person proximity prompt badge */}
+      {isNearby && (
+        <div className="char-interact-prompt animate-bounce-subtle">
+          <span className="key-badge">E</span>
+          <span>Bicara dengan {agent.name}</span>
+        </div>
+      )}
+
       {/* Dynamic Activity Overhead Pill */}
       {activity && !shouldShowBubble(agent.state) && (
         <div className="char-activity-badge" style={{ borderColor: `${activity.color}66` }}>
           <span className="badge-pulse-dot" style={{ background: activity.color, boxShadow: `0 0 6px ${activity.color}` }} />
           <span>{activity.icon}</span>
           <span>{activity.label}</span>
+        </div>
+      )}
+
+      {/* Live Retro Progress Bar (shown when job is running) */}
+      {agent.progress !== undefined && agent.progress >= 0 && (
+        <div className="char-progress-box">
+          <div className="char-progress-track">
+            <div
+              className={`char-progress-bar ${agent.statusType === 'error' ? 'bar-error' : 'bar-normal'}`}
+              style={{ width: `${Math.min(100, Math.max(0, agent.progress))}%` }}
+            />
+          </div>
+          <div className="char-progress-label">
+            {agent.progressLabel || `${Math.round(agent.progress)}%`}
+          </div>
         </div>
       )}
 
@@ -183,7 +210,9 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
             draggable={false}
           />
         )}
-        {isSitting && <div className="char-desk-glow" />}
+        {isSitting && (
+          <div className={`char-desk-glow ${agent.statusType === 'error' ? 'error-glow' : ''}`} />
+        )}
         <img
           src={spriteSrc}
           alt={agent.name}
